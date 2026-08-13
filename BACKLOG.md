@@ -1,6 +1,6 @@
 # Backlog
 
-## US-001 — Osoba składająca PC sprawdza zgodność konkretnych części  [w toku]
+## US-001 — Osoba składająca PC sprawdza zgodność konkretnych części  [do weryfikacji]
 
 Jako osoba składająca PC chcę wybrać konkretny procesor i płytę główną, żeby przed zakupem zobaczyć, czy mogą działać razem.
 
