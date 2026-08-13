@@ -8,6 +8,7 @@ from src.analyze_build import analyze_build
 from src.analyze_build import combine_analyses
 from src.analyze_build import analyze_memory
 from src.analyze_build import analyze_products
+from src.analyze_build import analyze_power_supply
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 
@@ -35,7 +36,7 @@ def page():
  <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
   <label for=power-supply>Zasilacz</label><select id=power-supply><option value>Wybierz zasilacz</option>''' + power_supply_options + '''</select>
    <output id=result>''' + RAM_ANALYSIS_REQUIRED_MESSAGE + '''</output>
-  <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams({cpuId:cpu.value,motherboardId:motherboard.value,ramId:memory.value});const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh)</script>
+    <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh);powerSupply.addEventListener('change',refresh)</script>
 </main></body></html>'''
 
 
@@ -45,25 +46,47 @@ class AppHandler(BaseHTTPRequestHandler):
         if request.path == '/api/analyze':
             query = parse_qs(request.query, keep_blank_values=True)
             value = lambda name: query.get(name, [''])[0]
+            has_all_part_keys = all(
+                name in query for name in ('cpuId', 'motherboardId', 'ramId')
+            )
+            has_all_part_values = all(
+                value(name) for name in ('cpuId', 'motherboardId', 'ramId')
+            )
             if (
-                'ramId' in query
-                and 'cpuId' in query
-                and 'motherboardId' in query
-                and value('cpuId')
+                'psuId' in query
+                or (has_all_part_keys and has_all_part_values)
             ):
+                cpu_id = value('cpuId')
+                motherboard_id = value('motherboardId')
+                ram_id = value('ramId')
+                psu_id = value('psuId')
                 socket_result = analyze_products(
-                    value('cpuId'),
-                    value('motherboardId'),
+                    cpu_id,
+                    motherboard_id,
                     CPUS,
                     MOTHERBOARDS,
                 )
                 memory_result = analyze_memory(
-                    value('motherboardId'),
-                    value('ramId'),
+                    motherboard_id,
+                    ram_id,
                     MOTHERBOARDS,
                     MEMORY,
                 )
-                result = combine_analyses(socket_result, memory_result)
+                analyses = [
+                    socket_result,
+                    memory_result,
+                    analyze_power_supply(
+                        cpu_id,
+                        motherboard_id,
+                        ram_id,
+                        psu_id,
+                        CPUS,
+                        MOTHERBOARDS,
+                        MEMORY,
+                        POWER_SUPPLIES,
+                    ),
+                ]
+                result = combine_analyses(*analyses)
             elif 'ramId' in query or ('motherboardId' in query and 'cpuId' not in query):
                 result = analyze_memory(
                     value('motherboardId'),

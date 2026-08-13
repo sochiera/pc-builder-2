@@ -2,6 +2,7 @@ from src.catalog import find_product
 
 
 RAM_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz plyte glowna i pamiec RAM, aby sprawdzic zgodnosc.'
+POWER_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz procesor, plyte glowna, pamiec RAM i zasilacz, aby sprawdzic moc.'
 
 
 def combine_analyses(*analyses):
@@ -81,4 +82,38 @@ def analyze_memory(motherboard_id, ram_id, motherboards, memories):
     return {
         'level': 'ok',
         'message': f'Pamiec RAM {memory_standard} jest zgodna z plyta glowna.',
+    }
+
+
+def analyze_power_supply(cpu_id, motherboard_id, ram_id, psu_id, cpus, motherboards, memories, power_supplies):
+    if not all((cpu_id, motherboard_id, ram_id, psu_id)):
+        return {
+            'level': 'info',
+            'message': POWER_ANALYSIS_REQUIRED_MESSAGE,
+        }
+
+    products = (
+        find_product(cpus, cpu_id),
+        find_product(motherboards, motherboard_id),
+        find_product(memories, ram_id),
+        find_product(power_supplies, psu_id),
+    )
+    if any(product is None for product in products):
+        return {
+            'level': 'info',
+            'message': 'Wybierz znane czesci i zasilacz, aby sprawdzic moc.',
+        }
+
+    cpu, motherboard, memory, power_supply = products
+    required = sum(product['power_watts'] for product in (cpu, motherboard, memory))
+    available = power_supply['power_watts']
+    if available < required:
+        return {
+            'level': 'blocking',
+            'message': f'Zestaw wymaga {required} W, a zasilacz dostarcza {available} W.',
+        }
+
+    return {
+        'level': 'ok',
+        'message': f'Moc zasilacza {available} W jest wystarczajaca; zestaw wymaga {required} W.',
     }

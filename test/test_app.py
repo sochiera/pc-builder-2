@@ -7,6 +7,7 @@ import subprocess
 from threading import Thread
 import time
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -235,6 +236,94 @@ class AppTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(analysis['level'], 'info')
 
+    def test_power_supply_analysis_reports_sufficient_missing_and_unknown_choices(self):
+        base_query = (
+            'cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+            '&ramId=corsair-vengeance-ddr5'
+        )
+
+        with self.subTest('sufficient power supply'):
+            status, sufficient = self.get_json(
+                f'/api/analyze?{base_query}&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(sufficient['level'], 'ok')
+            self.assertIn('wymaga 210 W', sufficient['message'])
+            self.assertIn('750 W', sufficient['message'])
+            self.assertIn('wystarczajaca', sufficient['message'])
+            self.assertIn('Socket AM5 procesora i plyty glownej jest zgodny.', sufficient['message'])
+            self.assertIn('Pamiec RAM DDR5 jest zgodna z plyta glowna.', sufficient['message'])
+
+        with self.subTest('exactly sufficient power supply'):
+            exact_supply = ({'id': 'exact-psu', 'name': 'Graniczny zasilacz', 'power_watts': 210},)
+            with patch('src.server.POWER_SUPPLIES', exact_supply):
+                status, exact = self.get_json(f'/api/analyze?{base_query}&psuId=exact-psu')
+            self.assertEqual(status, 200)
+            self.assertEqual(exact['level'], 'ok')
+
+        with self.subTest('insufficient power supply'):
+            weak_supply = ({'id': 'weak-psu', 'name': 'Slaby zasilacz', 'power_watts': 100},)
+            with patch('src.server.POWER_SUPPLIES', weak_supply):
+                status, insufficient = self.get_json(f'/api/analyze?{base_query}&psuId=weak-psu')
+            self.assertEqual(status, 200)
+            self.assertEqual(insufficient['level'], 'blocking')
+            self.assertIn('wymaga 210 W', insufficient['message'])
+            self.assertIn('dostarcza 100 W', insufficient['message'])
+
+        with self.subTest('missing power supply'):
+            status, missing = self.get_json(f'/api/analyze?{base_query}')
+            self.assertEqual(status, 200)
+            self.assertEqual(missing['level'], 'info')
+            self.assertIn('zasilacz', missing['message'].lower())
+
+        with self.subTest('empty power supply form choice'):
+            status, missing = self.get_json(f'/api/analyze?{base_query}&psuId=')
+            self.assertEqual(status, 200)
+            self.assertEqual(missing['level'], 'info')
+            self.assertIn('zasilacz', missing['message'].lower())
+
+        with self.subTest('missing part'):
+            status, missing = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+                '&ramId=&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(missing['level'], 'info')
+            self.assertIn('pamiec RAM', missing['message'])
+
+        with self.subTest('missing RAM key with power supply'):
+            status, missing = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+                '&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(missing['level'], 'info')
+            self.assertIn('pamiec RAM', missing['message'])
+
+        with self.subTest('missing CPU key with power supply'):
+            status, missing = self.get_json(
+                '/api/analyze?motherboardId=msi-b650'
+                '&ramId=corsair-vengeance-ddr5&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(missing['level'], 'info')
+            self.assertIn('procesor', missing['message'].lower())
+
+        with self.subTest('unknown power supply'):
+            status, unknown = self.get_json(
+                f'/api/analyze?{base_query}&psuId=unknown-psu'
+            )
+            self.assertEqual(status, 200)
+            self.assertNotIn(unknown['level'], ('ok', 'blocking'))
+
+        with self.subTest('unknown part'):
+            status, unknown = self.get_json(
+                '/api/analyze?cpuId=unknown-cpu&motherboardId=msi-b650'
+                '&ramId=corsair-vengeance-ddr5&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertNotIn(unknown['level'], ('ok', 'blocking'))
+
     def test_analysis_accepts_compatible_ram_for_motherboard(self):
         status, analysis = self.get_json(
             '/api/analyze?motherboardId=msi-b650&ramId=corsair-vengeance-ddr5'
@@ -263,7 +352,7 @@ class AppTest(unittest.TestCase):
             with self.subTest(ram_id=ram_id):
                 status, analysis = self.get_json(
                     '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
-                    f'&ramId={ram_id}'
+                    f'&ramId={ram_id}&psuId=corsair-rm750x'
                 )
 
                 self.assertEqual(status, 200)
@@ -276,6 +365,48 @@ class AppTest(unittest.TestCase):
                 if expected_level == 'blocking':
                     self.assertIn('plyta obsluguje DDR5', analysis['message'])
 
+    def test_incomplete_power_analysis_does_not_hide_socket_or_ram_findings(self):
+        with self.subTest('missing power supply preserves incomplete power status'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+                '&ramId=corsair-vengeance-ddr5'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'info')
+            self.assertIn('zasilacz', analysis['message'].lower())
+            self.assertIn('socketu AM5', analysis['message'])
+
+        with self.subTest('unknown power supply preserves incomplete power status'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+                '&ramId=corsair-vengeance-ddr5&psuId=unknown-psu'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'info')
+            self.assertIn('znane czesci i zasilacz', analysis['message'])
+            self.assertIn('socketu AM5', analysis['message'])
+
+        with self.subTest('complete power analysis preserves blocking findings'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+                '&ramId=kingston-fury-ddr4&psuId=corsair-rm750x'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('socketu AM5', analysis['message'])
+            self.assertIn('Pamiec RAM DDR4 jest niezgodna', analysis['message'])
+
+    def test_power_analysis_requires_cpu_when_all_form_fields_are_present(self):
+        status, analysis = self.get_json(
+            '/api/analyze?cpuId=&motherboardId=msi-b650'
+            '&ramId=corsair-vengeance-ddr5&psuId=corsair-rm750x'
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(analysis['level'], 'info')
+        self.assertIn('procesor', analysis['message'].lower())
+        self.assertIn('zasilacz', analysis['message'].lower())
+
     def test_analysis_keeps_socket_blocking_when_ram_is_selected(self):
         for ram_id in (
             'corsair-vengeance-ddr5',
@@ -284,7 +415,7 @@ class AppTest(unittest.TestCase):
             with self.subTest(ram_id=ram_id):
                 status, analysis = self.get_json(
                     '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
-                    f'&ramId={ram_id}'
+                    f'&ramId={ram_id}&psuId=corsair-rm750x'
                 )
 
                 self.assertEqual(status, 200)
@@ -341,6 +472,56 @@ class AppTest(unittest.TestCase):
         self.assertEqual(len(requests), 1)
         self.assertIn('motherboardId=msi-b650', requests[0])
         self.assertIn('ramId=kingston-fury-ddr4', requests[0])
+
+    def test_page_refreshes_power_analysis_with_selected_power_supply(self):
+        with Browser(self.base_url) as browser:
+            requests = browser.evaluate("""
+                (async () => {
+                    const requests = [];
+                    window.fetch = url => {
+                        requests.push(url);
+                        return Promise.resolve({
+                            json: () => Promise.resolve({level: 'ok', message: 'ok'})
+                        });
+                    };
+                    document.querySelector('#cpu').value = 'ryzen-7-7800x3d';
+                    document.querySelector('#motherboard').value = 'msi-b650';
+                    document.querySelector('#memory').value = 'corsair-vengeance-ddr5';
+                    const powerSupply = document.querySelector('#power-supply');
+                    powerSupply.value = 'corsair-rm750x';
+                    powerSupply.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return requests;
+                })()
+            """)
+
+        self.assertEqual(len(requests), 1)
+        self.assertIn('cpuId=ryzen-7-7800x3d', requests[0])
+        self.assertIn('motherboardId=msi-b650', requests[0])
+        self.assertIn('ramId=corsair-vengeance-ddr5', requests[0])
+        self.assertIn('psuId=corsair-rm750x', requests[0])
+
+    def test_page_reports_missing_cpu_when_power_supply_changes_before_complete_build(self):
+        with Browser(self.base_url) as browser:
+            analysis = browser.evaluate("""
+                (async () => {
+                    document.querySelector('#motherboard').value = 'msi-b650';
+                    document.querySelector('#memory').value = 'corsair-vengeance-ddr5';
+                    const powerSupply = document.querySelector('#power-supply');
+                    powerSupply.value = 'corsair-rm750x';
+                    powerSupply.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    return {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    };
+                })()
+            """)
+
+        self.assertEqual(analysis['level'], 'info')
+        self.assertIn('procesor', analysis['text'].lower())
+        self.assertIn('zasilacz', analysis['text'].lower())
+        self.assertIn('Pamiec RAM DDR5 jest zgodna', analysis['text'])
 
     def test_page_shows_ram_status_before_and_after_memory_change(self):
         with Browser(self.base_url) as browser:
