@@ -15,3 +15,11 @@ Jako osoba składająca PC chcę dobrać pamięć RAM do wybranej płyty główn
 - Dlaczego teraz: PROJECT.md wskazuje reguły RAM jako najbliższy etap po katalogu CPU i płyt oraz wymaga, aby ocena zestawu uwzględniała pamięć.
 - Sprawdzenie: uruchom demo, wybierz płytę główną oraz kolejno zgodną i niezgodną pamięć, a następnie potwierdź, że widoczna ocena zestawu rozróżnia oba przypadki.
 - Poza zakresem: pojemność i wydajność pamięci, procesorowe ograniczenia pamięci, zasilanie, montaż fizyczny, ceny i pozostałe kategorie części.
+
+## US-003 — Osoba składająca PC sprawdza, czy zasilacz wystarczy zestawowi  [nowa]
+
+Jako osoba składająca PC chcę dobrać zasilacz do wybranych części, żeby przed zakupem zobaczyć, czy zapewni im wystarczającą moc.
+
+- Dlaczego teraz: PROJECT.md wymaga uwzględnienia zasilania w ocenie zestawu, a żadna obecna historyjka nie pokrywa tego wymagania.
+- Sprawdzenie: uruchom demo, wybierz zestaw części oraz kolejno zasilacz o wystarczającej i niewystarczającej mocy, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
+- Poza zakresem: zgodność złączy, sprawność i jakość zasilacza, zapas mocy, ceny, montaż fizyczny oraz pozostałe kategorie części.
