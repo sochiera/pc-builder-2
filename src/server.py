@@ -4,18 +4,27 @@ import os
 from urllib.parse import parse_qs, urlparse
 
 from src.analyze_build import analyze_build
+from src.analyze_build import analyze_products
+from src.catalog import CPUS, MOTHERBOARDS
 
 
 def page():
+    cpu_options = ''.join(
+        f"<option value={cpu['id']}>{cpu['name']}</option>" for cpu in CPUS
+    )
+    motherboard_options = ''.join(
+        f"<option value={board['id']}>{board['name']}</option>"
+        for board in MOTHERBOARDS
+    )
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
 <style>body{max-width:720px;margin:48px auto;padding:0 20px;font:16px system-ui;color:#17211b;background:#f4f6f1}main{background:white;padding:32px;border-radius:14px}label{display:block;margin:20px 0 6px}select{width:100%;padding:10px}#result{display:block;margin-top:24px;padding:14px;background:#edf4e9;border-radius:8px}</style></head>
 <body><main><h1>Konfigurator PC</h1><p>Sprawdz pierwszy warunek kompatybilnosci zestawu.</p>
-<label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option><option value=AM5>AMD Ryzen 7 7800X3D - AM5</option><option value=LGA1700>Intel Core i5-14600K - LGA1700</option></select>
-<label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option><option value=AM5>MSI B650 - AM5</option><option value=LGA1700>ASUS Z790 - LGA1700</option></select>
-<output id=result>Wybierz procesor i plyte glowna, aby sprawdzic socket.</output>
-<script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),result=document.querySelector('#result');async function refresh(){const response=await fetch('/api/analyze?cpuSocket='+encodeURIComponent(cpu.value)+'&motherboardSocket='+encodeURIComponent(motherboard.value));const analysis=await response.json();result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh)</script>
+ <label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option>''' + cpu_options + '''</select>
+ <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
+ <output id=result>Wybierz procesor i plyte glowna, aby sprawdzic socket.</output>
+ <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),result=document.querySelector('#result');async function refresh(){const response=await fetch('/api/analyze?cpuId='+encodeURIComponent(cpu.value)+'&motherboardId='+encodeURIComponent(motherboard.value));const analysis=await response.json();result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh)</script>
 </main></body></html>'''
 
 
@@ -24,10 +33,18 @@ class AppHandler(BaseHTTPRequestHandler):
         request = urlparse(self.path)
         if request.path == '/api/analyze':
             query = parse_qs(request.query)
-            result = analyze_build(
-                query.get('cpuSocket', [''])[0],
-                query.get('motherboardSocket', [''])[0],
-            )
+            if 'cpuId' in query or 'motherboardId' in query:
+                result = analyze_products(
+                    query.get('cpuId', [''])[0],
+                    query.get('motherboardId', [''])[0],
+                    CPUS,
+                    MOTHERBOARDS,
+                )
+            else:
+                result = analyze_build(
+                    query.get('cpuSocket', [''])[0],
+                    query.get('motherboardSocket', [''])[0],
+                )
             self.respond(200, 'application/json; charset=utf-8', json.dumps(result))
             return
         if request.path == '/':
