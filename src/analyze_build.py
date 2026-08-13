@@ -1,6 +1,9 @@
 from src.catalog import find_product
 
 
+RAM_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz plyte glowna i pamiec RAM, aby sprawdzic zgodnosc.'
+
+
 def combine_analyses(*analyses):
     levels = [analysis['level'] for analysis in analyses]
     if 'info' in levels:
@@ -53,7 +56,7 @@ def analyze_memory(motherboard_id, ram_id, motherboards, memories):
     if not motherboard_id or not ram_id:
         return {
             'level': 'info',
-            'message': 'Wybierz plyte glowna i pamiec RAM, aby sprawdzic zgodnosc.',
+            'message': RAM_ANALYSIS_REQUIRED_MESSAGE,
         }
 
     motherboard = find_product(motherboards, motherboard_id)

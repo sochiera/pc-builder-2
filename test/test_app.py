@@ -313,6 +313,109 @@ class AppTest(unittest.TestCase):
         self.assertIn('motherboardId=msi-b650', requests[0])
         self.assertIn('ramId=kingston-fury-ddr4', requests[0])
 
+    def test_page_shows_ram_status_before_and_after_memory_change(self):
+        with Browser(self.base_url) as browser:
+            initial = browser.evaluate("document.querySelector('#result').textContent")
+            statuses = browser.evaluate("""
+                (async () => {
+                    const motherboard = document.querySelector('#motherboard');
+                    const memory = document.querySelector('#memory');
+                    motherboard.value = 'msi-b650';
+                    memory.value = 'corsair-vengeance-ddr5';
+                    memory.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    const compatible = {
+                        text: document.querySelector('#result').textContent,
+                        level: document.querySelector('#result').dataset.level,
+                    };
+                    const compatiblePublic = await fetch(
+                        '/api/analyze?motherboardId=msi-b650&ramId=corsair-vengeance-ddr5'
+                    ).then(response => response.json());
+                    memory.value = 'kingston-fury-ddr4';
+                    memory.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    const incompatible = {
+                        text: document.querySelector('#result').textContent,
+                        level: document.querySelector('#result').dataset.level,
+                    };
+                    const incompatiblePublic = await fetch(
+                        '/api/analyze?motherboardId=msi-b650&ramId=kingston-fury-ddr4'
+                    ).then(response => response.json());
+                    return {
+                        compatible,
+                        compatiblePublic,
+                        incompatible,
+                        incompatiblePublic,
+                        location: window.location.href,
+                    };
+                })()
+            """)
+
+        self.assertIn('plyte glowna i pamiec RAM', initial)
+        self.assertEqual(statuses['compatible']['level'], 'ok')
+        self.assertIn('DDR5', statuses['compatible']['text'])
+        self.assertIn('zgodna', statuses['compatible']['text'])
+        self.assertEqual(statuses['compatible']['level'], statuses['compatiblePublic']['level'])
+        self.assertEqual(statuses['compatible']['text'], statuses['compatiblePublic']['message'])
+        self.assertEqual(statuses['incompatible']['level'], 'blocking')
+        self.assertIn('DDR4', statuses['incompatible']['text'])
+        self.assertIn('DDR5', statuses['incompatible']['text'])
+        self.assertEqual(statuses['incompatible']['level'], statuses['incompatiblePublic']['level'])
+        self.assertEqual(statuses['incompatible']['text'], statuses['incompatiblePublic']['message'])
+        self.assertEqual(statuses['location'], self.base_url + '/')
+
+    def test_page_ignores_stale_ram_analysis_response(self):
+        with Browser(self.base_url) as browser:
+            status = browser.evaluate("""
+                (async () => {
+                    const responses = new Map();
+                    const requested = [];
+                    window.fetch = url => {
+                        requested.push(url);
+                        return new Promise(resolve => responses.set(url, resolve))
+                            .then(response => response);
+                    };
+                    const motherboard = document.querySelector('#motherboard');
+                    const memory = document.querySelector('#memory');
+                    motherboard.value = 'msi-b650';
+                    memory.value = 'corsair-vengeance-ddr5';
+                    memory.dispatchEvent(new Event('change'));
+                    memory.value = 'kingston-fury-ddr4';
+                    memory.dispatchEvent(new Event('change'));
+                    while (requested.length < 2) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                    const oldResponse = {
+                        json: () => Promise.resolve({
+                            level: 'ok',
+                            message: 'Plyta obsluguje pamiec DDR5.'
+                        })
+                    };
+                    const currentResponse = {
+                        json: () => Promise.resolve({
+                            level: 'blocking',
+                            message: 'Plyta obsluguje DDR5, a wybrana pamiec to DDR4.'
+                        })
+                    };
+                    responses.get(requested[1])(currentResponse);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    responses.get(requested[0])(oldResponse);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return {
+                        text: document.querySelector('#result').textContent,
+                        level: document.querySelector('#result').dataset.level,
+                        requested,
+                    };
+                })()
+            """)
+
+        self.assertEqual(len(status['requested']), 2)
+        self.assertEqual(status['level'], 'blocking')
+        self.assertEqual(
+            status['text'],
+            'Plyta obsluguje DDR5, a wybrana pamiec to DDR4.',
+        )
+
     def test_running_app_detects_incompatible_cpu_and_motherboard_socket(self):
         with urlopen(f'{self.base_url}/') as response:
             self.assertIn('Konfigurator PC', response.read().decode())
