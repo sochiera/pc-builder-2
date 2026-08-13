@@ -7,11 +7,12 @@ from urllib.parse import parse_qs, urlparse
 from src.analyze_build import analyze_build
 from src.analyze_build import combine_analyses
 from src.analyze_build import analyze_memory
+from src.analyze_build import analyze_case
 from src.analyze_build import analyze_products
 from src.analyze_build import analyze_power_supply
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
-from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
+from src.catalog import CASES, CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 
 
 def render_options(products):
@@ -27,6 +28,7 @@ def page():
     motherboard_options = render_options(MOTHERBOARDS)
     memory_options = render_options(MEMORY)
     power_supply_options = render_options(POWER_SUPPLIES)
+    case_options = render_options(CASES)
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
@@ -34,11 +36,21 @@ def page():
 <body><main><h1>Konfigurator PC</h1><p>Sprawdz pierwszy warunek kompatybilnosci zestawu.</p>
  <label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option>''' + cpu_options + '''</select>
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
- <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
+  <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
   <label for=power-supply>Zasilacz</label><select id=power-supply><option value>Wybierz zasilacz</option>''' + power_supply_options + '''</select>
+  <label for=case>Obudowa</label><select id=case><option value>Wybierz obudowe</option>''' + case_options + '''</select>
     <output id=result>''' + POWER_ANALYSIS_REQUIRED_MESSAGE + '''</output>
-    <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh);powerSupply.addEventListener('change',refresh)</script>
-</main></body></html>'''
+    <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);if(caseSelect.value)params.set('caseId',caseSelect.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}[cpu,motherboard,memory,powerSupply,caseSelect].forEach(select=>select.addEventListener('change',refresh))</script>
+    </main></body></html>'''
+
+
+def analyze_selected_case(motherboard_id, case_id):
+    return analyze_case(
+        motherboard_id,
+        case_id,
+        MOTHERBOARDS,
+        CASES,
+    )
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -61,6 +73,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 motherboard_id = value('motherboardId')
                 ram_id = value('ramId')
                 psu_id = value('psuId')
+                case_id = value('caseId')
                 socket_result = analyze_products(
                     cpu_id,
                     motherboard_id,
@@ -87,6 +100,30 @@ class AppHandler(BaseHTTPRequestHandler):
                         POWER_SUPPLIES,
                     ),
                 ]
+                if 'caseId' in query:
+                    analyses.append(analyze_selected_case(motherboard_id, case_id))
+                result = combine_analyses(*analyses)
+            elif 'caseId' in query:
+                motherboard_id = value('motherboardId')
+                analyses = [analyze_selected_case(motherboard_id, value('caseId'))]
+                if 'ramId' in query:
+                    analyses.append(
+                        analyze_memory(
+                            motherboard_id,
+                            value('ramId'),
+                            MOTHERBOARDS,
+                            MEMORY,
+                        )
+                    )
+                if 'cpuId' in query:
+                    analyses.append(
+                        analyze_products(
+                            value('cpuId'),
+                            motherboard_id,
+                            CPUS,
+                            MOTHERBOARDS,
+                        )
+                    )
                 result = combine_analyses(*analyses)
             elif 'ramId' in query or ('motherboardId' in query and 'cpuId' not in query):
                 result = analyze_memory(

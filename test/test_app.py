@@ -11,6 +11,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+from src import catalog
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 from src.server import create_app
 
@@ -179,6 +180,168 @@ class AppTest(unittest.TestCase):
         options_by_name = {name: value for value, name in power_supply_options}
         for product in POWER_SUPPLIES:
             self.assertEqual(options_by_name[product['name']], product['id'])
+
+    def test_case_catalog_exposes_formats_for_matching_and_mismatching_boards(self):
+        cases = getattr(catalog, 'CASES', ())
+
+        self.assertGreaterEqual(len(cases), 2)
+        if len(cases) < 2:
+            return
+
+        self.assertEqual(len({case.get('id') for case in cases}), len(cases))
+        self.assertTrue(all(case.get('id') and case.get('name') for case in cases))
+        self.assertTrue(all(case.get('supported_form_factors') for case in cases))
+        self.assertGreaterEqual(
+            len({tuple(case['supported_form_factors']) for case in cases}),
+            2,
+        )
+
+        self.assertTrue(MOTHERBOARDS)
+        self.assertTrue(
+            all(
+                board.get('id') and board.get('name') and board.get('form_factor')
+                for board in MOTHERBOARDS
+            )
+        )
+        self.assertTrue(
+            any(
+                board['form_factor'] in case['supported_form_factors']
+                for board in MOTHERBOARDS
+                for case in cases
+            )
+        )
+        self.assertTrue(
+            any(
+                board['form_factor'] not in case['supported_form_factors']
+                for board in MOTHERBOARDS
+                for case in cases
+            )
+        )
+
+    def test_page_exposes_named_case_products_with_stable_catalog_identifiers(self):
+        with urlopen(self.base_url) as response:
+            page = response.read().decode()
+
+        parser = OptionParser()
+        parser.feed(page)
+        case_options = parser.options_by_select.get('case', [])
+        cases = getattr(catalog, 'CASES', ())
+
+        self.assertGreaterEqual(len(case_options), 2)
+        if len(case_options) < 2:
+            return
+        self.assertTrue(all(value and value != name for value, name in case_options))
+        self.assertEqual(
+            {value for value, _ in case_options},
+            {case.get('id') for case in cases},
+        )
+        self.assertEqual(
+            {name for _, name in case_options},
+            {case.get('name') for case in cases},
+        )
+
+    def test_page_sends_selected_case_identifier_when_case_changes(self):
+        with Browser(self.base_url) as browser:
+            requests = browser.evaluate("""
+                (async () => {
+                    const requests = [];
+                    window.fetch = url => {
+                        requests.push(url);
+                        return Promise.resolve({
+                            json: () => Promise.resolve({level: 'info', message: 'ok'})
+                        });
+                    };
+                    const caseSelect = document.querySelector('#case');
+                    if (!caseSelect) return requests;
+                    caseSelect.value = 'atx-mid-tower';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return requests;
+                })()
+            """)
+
+        self.assertEqual(len(requests), 1)
+        self.assertIn('caseId=atx-mid-tower', requests[0])
+
+    def test_full_build_analysis_combines_case_fit_with_other_results(self):
+        base_query = (
+            'cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+            '&ramId=corsair-vengeance-ddr5&psuId=corsair-rm750x'
+        )
+
+        with self.subTest('compatible case'):
+            status, analysis = self.get_json(
+                f'/api/analyze?{base_query}&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'ok')
+            self.assertIn('ATX', analysis['message'])
+            self.assertIn('obud', analysis['message'].lower())
+
+        with self.subTest('incompatible case'):
+            status, analysis = self.get_json(
+                f'/api/analyze?{base_query}&caseId=mini-itx-compact'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('ATX', analysis['message'])
+            self.assertIn('Mini-ITX', analysis['message'])
+
+        with self.subTest('unknown case'):
+            status, analysis = self.get_json(
+                f'/api/analyze?{base_query}&caseId=unknown-case'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'info')
+            self.assertIn('znana plyte glowna i obudowe', analysis['message'])
+
+    def test_partial_case_analysis_uses_motherboard_and_case_without_other_parts(self):
+        with self.subTest('compatible case'):
+            status, analysis = self.get_json(
+                '/api/analyze?motherboardId=msi-b650&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'ok')
+            self.assertIn('ATX', analysis['message'])
+            self.assertIn('obudowy', analysis['message'])
+
+        with self.subTest('incompatible case'):
+            status, analysis = self.get_json(
+                '/api/analyze?motherboardId=msi-b650&caseId=mini-itx-compact'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('ATX', analysis['message'])
+            self.assertIn('Mini-ITX', analysis['message'])
+
+    def test_case_only_analysis_reports_missing_motherboard_and_case_data(self):
+        status, analysis = self.get_json('/api/analyze?caseId=atx-mid-tower')
+
+        self.assertEqual(status, 200)
+        self.assertEqual(analysis['level'], 'info')
+        self.assertIn('Wybierz plyte glowna i obudowe', analysis['message'])
+
+    def test_partial_case_analysis_combines_case_with_selected_ram_or_cpu(self):
+        with self.subTest('case analysis preserves RAM mismatch'):
+            status, analysis = self.get_json(
+                '/api/analyze?motherboardId=msi-b650'
+                '&ramId=kingston-fury-ddr4&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('Pamiec RAM DDR4 jest niezgodna', analysis['message'])
+            self.assertIn('Plyta w formacie ATX pasuje do obudowy', analysis['message'])
+
+        with self.subTest('case analysis preserves socket mismatch'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d'
+                '&motherboardId=asus-z790&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('socketu AM5', analysis['message'])
+            self.assertIn('LGA1700', analysis['message'])
+            self.assertIn('Plyta w formacie ATX pasuje do obudowy', analysis['message'])
 
     def test_catalog_exposes_power_demand_for_parts_and_power_rating(self):
         for products in (CPUS, MOTHERBOARDS, MEMORY):

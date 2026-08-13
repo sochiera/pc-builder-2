@@ -19,6 +19,7 @@ MOTHERBOARDS = (
         'name': 'MSI B650',
         'socket': 'AM5',
         'memory_standard': 'DDR5',
+        'form_factor': 'ATX',
         'power_watts': 80,
     },
     {
@@ -26,6 +27,7 @@ MOTHERBOARDS = (
         'name': 'ASUS Z790',
         'socket': 'LGA1700',
         'memory_standard': 'DDR5',
+        'form_factor': 'ATX',
         'power_watts': 70,
     },
 )
@@ -48,6 +50,19 @@ MEMORY = (
 POWER_SUPPLIES = (
     {'id': 'corsair-rm750x', 'name': 'Corsair RM750x', 'power_watts': 750},
     {'id': 'be-quiet-pure-power-12-m-850w', 'name': 'be quiet! Pure Power 12 M 850W', 'power_watts': 850},
+)
+
+CASES = (
+    {
+        'id': 'atx-mid-tower',
+        'name': 'ATX Mid Tower',
+        'supported_form_factors': ('ATX', 'Micro-ATX', 'Mini-ITX'),
+    },
+    {
+        'id': 'mini-itx-compact',
+        'name': 'Mini-ITX Compact',
+        'supported_form_factors': ('Mini-ITX',),
+    },
 )
 
 

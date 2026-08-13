@@ -85,6 +85,38 @@ def analyze_memory(motherboard_id, ram_id, motherboards, memories):
     }
 
 
+def analyze_case(motherboard_id, case_id, motherboards, cases):
+    if not motherboard_id or not case_id:
+        return {
+            'level': 'info',
+            'message': 'Wybierz plyte glowna i obudowe, aby sprawdzic format.',
+        }
+
+    motherboard = find_product(motherboards, motherboard_id)
+    case = find_product(cases, case_id)
+    if not motherboard or not case:
+        return {
+            'level': 'info',
+            'message': 'Wybierz znana plyte glowna i obudowe, aby sprawdzic format.',
+        }
+
+    form_factor = motherboard['form_factor']
+    supported_form_factors = case['supported_form_factors']
+    if form_factor not in supported_form_factors:
+        return {
+            'level': 'blocking',
+            'message': (
+                f'Plyta w formacie {form_factor} nie pasuje do obudowy '
+                f'obslugujacej formaty: {", ".join(supported_form_factors)}.'
+            ),
+        }
+
+    return {
+        'level': 'ok',
+        'message': f'Plyta w formacie {form_factor} pasuje do obudowy.',
+    }
+
+
 def analyze_power_supply(cpu_id, motherboard_id, ram_id, psu_id, cpus, motherboards, memories, power_supplies):
     if not all((cpu_id, motherboard_id, ram_id, psu_id)):
         return {
