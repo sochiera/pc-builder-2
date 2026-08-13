@@ -8,6 +8,11 @@ MOTHERBOARDS = (
     {'id': 'asus-z790', 'name': 'ASUS Z790', 'socket': 'LGA1700'},
 )
 
+MEMORY = (
+    {'id': 'corsair-vengeance-ddr5', 'name': 'Corsair Vengeance DDR5', 'standard': 'DDR5'},
+    {'id': 'kingston-fury-ddr4', 'name': 'Kingston Fury DDR4', 'standard': 'DDR4'},
+)
+
 
 def find_product(products, product_id):
     return next((product for product in products if product['id'] == product_id), None)

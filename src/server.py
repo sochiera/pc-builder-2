@@ -5,17 +5,19 @@ from urllib.parse import parse_qs, urlparse
 
 from src.analyze_build import analyze_build
 from src.analyze_build import analyze_products
-from src.catalog import CPUS, MOTHERBOARDS
+from src.catalog import CPUS, MEMORY, MOTHERBOARDS
 
 
 def page():
-    cpu_options = ''.join(
-        f"<option value={cpu['id']}>{cpu['name']}</option>" for cpu in CPUS
-    )
-    motherboard_options = ''.join(
-        f"<option value={board['id']}>{board['name']}</option>"
-        for board in MOTHERBOARDS
-    )
+    def options(products):
+        return ''.join(
+            f"<option value={product['id']}>{product['name']}</option>"
+            for product in products
+        )
+
+    cpu_options = options(CPUS)
+    motherboard_options = options(MOTHERBOARDS)
+    memory_options = options(MEMORY)
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
@@ -23,6 +25,7 @@ def page():
 <body><main><h1>Konfigurator PC</h1><p>Sprawdz pierwszy warunek kompatybilnosci zestawu.</p>
  <label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option>''' + cpu_options + '''</select>
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
+ <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
  <output id=result>Wybierz procesor i plyte glowna, aby sprawdzic socket.</output>
  <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),result=document.querySelector('#result');async function refresh(){const response=await fetch('/api/analyze?cpuId='+encodeURIComponent(cpu.value)+'&motherboardId='+encodeURIComponent(motherboard.value));const analysis=await response.json();result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh)</script>
 </main></body></html>'''

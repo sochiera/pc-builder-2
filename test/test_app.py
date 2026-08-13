@@ -5,6 +5,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+from src.catalog import MEMORY
 from src.server import create_app
 
 
@@ -12,10 +13,14 @@ class OptionParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.options = []
+        self.options_by_select = {}
+        self.current_select = None
         self.current_value = None
         self.current_text = []
 
     def handle_starttag(self, tag, attrs):
+        if tag == 'select':
+            self.current_select = dict(attrs).get('id')
         if tag == 'option':
             self.current_value = dict(attrs).get('value')
             self.current_text = []
@@ -26,8 +31,12 @@ class OptionParser(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == 'option' and self.current_value is not None:
-            self.options.append((self.current_value, ''.join(self.current_text)))
+            option = (self.current_value, ''.join(self.current_text))
+            self.options.append(option)
+            self.options_by_select.setdefault(self.current_select, []).append(option)
             self.current_value = None
+        if tag == 'select':
+            self.current_select = None
 
 
 class AppTest(unittest.TestCase):
@@ -63,6 +72,25 @@ class AppTest(unittest.TestCase):
         )
         self.assertIn(('msi-b650', 'MSI B650'), parser.options)
         self.assertIn(('asus-z790', 'ASUS Z790'), parser.options)
+
+    def test_page_exposes_named_ram_products_in_different_memory_standards(self):
+        with urlopen(self.base_url) as response:
+            page = response.read().decode()
+
+        parser = OptionParser()
+        parser.feed(page)
+        ram_options = parser.options_by_select.get('memory', [])
+
+        self.assertGreaterEqual(len(ram_options), 2)
+        self.assertIn(('corsair-vengeance-ddr5', 'Corsair Vengeance DDR5'), ram_options)
+        self.assertIn(('kingston-fury-ddr4', 'Kingston Fury DDR4'), ram_options)
+        self.assertTrue(all(value and value != name for value, name in ram_options))
+
+    def test_memory_catalog_binds_products_to_public_standards(self):
+        standards_by_id = {product['id']: product['standard'] for product in MEMORY}
+
+        self.assertEqual(standards_by_id['corsair-vengeance-ddr5'], 'DDR5')
+        self.assertEqual(standards_by_id['kingston-fury-ddr4'], 'DDR4')
 
     def test_analysis_accepts_identifiers_for_compatible_pair(self):
         status, analysis = self.get_json(

@@ -8,7 +8,7 @@ Jako osoba składająca PC chcę wybrać konkretny procesor i płytę główną,
 - Sprawdzenie: uruchom demo, wybierz zgodną, a następnie niezgodną parę nazwanych produktów i potwierdź, że widoczny wynik zmienia się odpowiednio.
 - Poza zakresem: pozostałe kategorie części, ceny, import sklepowy, zapis konfiguracji i reguły inne niż zgodność procesora z płytą.
 
-## US-002 — Osoba składająca PC sprawdza zgodność pamięci z płytą główną  [nowa]
+## US-002 — Osoba składająca PC sprawdza zgodność pamięci z płytą główną  [w toku]
 
 Jako osoba składająca PC chcę dobrać pamięć RAM do wybranej płyty głównej, żeby przed zakupem zobaczyć, czy pamięć będzie z nią zgodna.
 
