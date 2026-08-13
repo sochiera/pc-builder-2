@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from html import escape
 import json
 import os
 from urllib.parse import parse_qs, urlparse
@@ -8,19 +9,22 @@ from src.analyze_build import combine_analyses
 from src.analyze_build import analyze_memory
 from src.analyze_build import analyze_products
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
-from src.catalog import CPUS, MEMORY, MOTHERBOARDS
+from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
+
+
+def render_options(products):
+    return ''.join(
+        f"<option value=\"{escape(product['id'], quote=True)}\">"
+        f"{escape(product['name'])}</option>"
+        for product in products
+    )
 
 
 def page():
-    def options(products):
-        return ''.join(
-            f"<option value={product['id']}>{product['name']}</option>"
-            for product in products
-        )
-
-    cpu_options = options(CPUS)
-    motherboard_options = options(MOTHERBOARDS)
-    memory_options = options(MEMORY)
+    cpu_options = render_options(CPUS)
+    motherboard_options = render_options(MOTHERBOARDS)
+    memory_options = render_options(MEMORY)
+    power_supply_options = render_options(POWER_SUPPLIES)
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
@@ -29,7 +33,8 @@ def page():
  <label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option>''' + cpu_options + '''</select>
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
  <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
-  <output id=result>''' + RAM_ANALYSIS_REQUIRED_MESSAGE + '''</output>
+  <label for=power-supply>Zasilacz</label><select id=power-supply><option value>Wybierz zasilacz</option>''' + power_supply_options + '''</select>
+   <output id=result>''' + RAM_ANALYSIS_REQUIRED_MESSAGE + '''</output>
   <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams({cpuId:cpu.value,motherboardId:motherboard.value,ramId:memory.value});const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh)</script>
 </main></body></html>'''
 

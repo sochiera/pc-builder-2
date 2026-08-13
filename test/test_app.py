@@ -10,7 +10,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-from src.catalog import MEMORY
+from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 from src.server import create_app
 
 
@@ -160,6 +160,35 @@ class AppTest(unittest.TestCase):
         self.assertIn(('corsair-vengeance-ddr5', 'Corsair Vengeance DDR5'), ram_options)
         self.assertIn(('kingston-fury-ddr4', 'Kingston Fury DDR4'), ram_options)
         self.assertTrue(all(value and value != name for value, name in ram_options))
+
+    def test_page_exposes_named_power_supply_products(self):
+        with urlopen(self.base_url) as response:
+            page = response.read().decode()
+
+        parser = OptionParser()
+        parser.feed(page)
+        power_supply_options = parser.options_by_select.get('power-supply', [])
+
+        self.assertGreaterEqual(len(power_supply_options), 2)
+        names = [name for _, name in power_supply_options]
+        self.assertIn('Corsair RM750x', names)
+        self.assertIn('be quiet! Pure Power 12 M 850W', names)
+        self.assertTrue(all(value and value != name for value, name in power_supply_options))
+
+        options_by_name = {name: value for value, name in power_supply_options}
+        for product in POWER_SUPPLIES:
+            self.assertEqual(options_by_name[product['name']], product['id'])
+
+    def test_catalog_exposes_power_demand_for_parts_and_power_rating(self):
+        for products in (CPUS, MOTHERBOARDS, MEMORY):
+            for product in products:
+                self.assertIn('power_watts', product)
+                self.assertGreater(product['power_watts'], 0)
+
+        ratings = [product['power_watts'] for product in POWER_SUPPLIES]
+        self.assertGreaterEqual(len(ratings), 2)
+        self.assertEqual(len(set(ratings)), len(ratings))
+        self.assertTrue(all(rating > 0 for rating in ratings))
 
     def test_memory_catalog_binds_products_to_public_standards(self):
         standards_by_id = {product['id']: product['standard'] for product in MEMORY}
