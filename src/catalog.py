@@ -4,8 +4,8 @@ CPUS = (
 )
 
 MOTHERBOARDS = (
-    {'id': 'msi-b650', 'name': 'MSI B650', 'socket': 'AM5'},
-    {'id': 'asus-z790', 'name': 'ASUS Z790', 'socket': 'LGA1700'},
+    {'id': 'msi-b650', 'name': 'MSI B650', 'socket': 'AM5', 'memory_standard': 'DDR5'},
+    {'id': 'asus-z790', 'name': 'ASUS Z790', 'socket': 'LGA1700', 'memory_standard': 'DDR5'},
 )
 
 MEMORY = (

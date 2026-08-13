@@ -1,6 +1,11 @@
 import json
+import base64
 from html.parser import HTMLParser
+import os
+import socket
+import subprocess
 from threading import Thread
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
@@ -37,6 +42,76 @@ class OptionParser(HTMLParser):
             self.current_value = None
         if tag == 'select':
             self.current_select = None
+
+
+class Browser:
+    def __init__(self, url):
+        self.url = url
+
+    def __enter__(self):
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            port = probe.getsockname()[1]
+        self.process = subprocess.Popen(
+            ['/snap/bin/chromium', '--headless', '--no-sandbox', '--disable-gpu',
+             f'--remote-debugging-port={port}', '--user-data-dir=/tmp/pc-builder-test',
+             'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(50):
+            try:
+                with urlopen(f'http://127.0.0.1:{port}/json') as response:
+                    target = json.loads(response.read())[0]['webSocketDebuggerUrl']
+                break
+            except Exception:
+                time.sleep(0.1)
+        else:
+            raise RuntimeError('Chromium DevTools endpoint did not start')
+        host, path = target.removeprefix('ws://').split('/', 1)
+        self.socket = socket.create_connection(tuple(host.split(':')))
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.socket.sendall(
+            f'GET /{path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\n'
+            f'Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n'
+            'Sec-WebSocket-Version: 13\r\n\r\n'.encode())
+        self.socket.recv(4096)
+        self.message_id = 0
+        self.command('Page.navigate', {'url': self.url})
+        time.sleep(0.2)
+        return self
+
+    def __exit__(self, *_):
+        self.socket.close()
+        self.process.terminate()
+        self.process.wait(timeout=5)
+
+    def command(self, method, params=None):
+        self.message_id += 1
+        payload = json.dumps({'id': self.message_id, 'method': method, 'params': params or {}}).encode()
+        mask = os.urandom(4)
+        masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+        if len(masked) < 126:
+            length = bytes([0x80 | len(masked)])
+        elif len(masked) < 65536:
+            length = b'\xfe' + len(masked).to_bytes(2, 'big')
+        else:
+            length = b'\xff' + len(masked).to_bytes(8, 'big')
+        self.socket.sendall(b'\x81' + length + mask + masked)
+        while True:
+            header = self.socket.recv(2)
+            length = header[1] & 0x7f
+            if length == 126:
+                length = int.from_bytes(self.socket.recv(2), 'big')
+            elif length == 127:
+                length = int.from_bytes(self.socket.recv(8), 'big')
+            if header[1] & 0x80:
+                self.socket.recv(4)
+            message = json.loads(self.socket.recv(length))
+            if message.get('id') == self.message_id:
+                return message
+
+    def evaluate(self, expression):
+        result = self.command('Runtime.evaluate', {
+            'expression': expression, 'awaitPromise': True, 'returnByValue': True})
+        return result['result']['result']['value']
 
 
 class AppTest(unittest.TestCase):
@@ -130,6 +205,113 @@ class AppTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(analysis['level'], 'info')
+
+    def test_analysis_accepts_compatible_ram_for_motherboard(self):
+        status, analysis = self.get_json(
+            '/api/analyze?motherboardId=msi-b650&ramId=corsair-vengeance-ddr5'
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(analysis['level'], 'ok')
+        self.assertIn('DDR5', analysis['message'])
+        self.assertIn('zgodna', analysis['message'])
+
+    def test_analysis_reports_ram_standard_mismatch(self):
+        status, analysis = self.get_json(
+            '/api/analyze?motherboardId=msi-b650&ramId=kingston-fury-ddr4'
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(analysis['level'], 'blocking')
+        self.assertIn('DDR4', analysis['message'])
+        self.assertIn('DDR5', analysis['message'])
+
+    def test_full_build_analysis_combines_socket_and_ram_results(self):
+        for ram_id, expected_level, expected_message in (
+            ('corsair-vengeance-ddr5', 'ok', 'Pamiec RAM DDR5 jest zgodna'),
+            ('kingston-fury-ddr4', 'blocking', 'Pamiec RAM DDR4 jest niezgodna'),
+        ):
+            with self.subTest(ram_id=ram_id):
+                status, analysis = self.get_json(
+                    '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+                    f'&ramId={ram_id}'
+                )
+
+                self.assertEqual(status, 200)
+                self.assertEqual(analysis['level'], expected_level)
+                self.assertIn(
+                    'Socket AM5 procesora i plyty glownej jest zgodny.',
+                    analysis['message'],
+                )
+                self.assertIn(expected_message, analysis['message'])
+                if expected_level == 'blocking':
+                    self.assertIn('plyta obsluguje DDR5', analysis['message'])
+
+    def test_analysis_keeps_socket_blocking_when_ram_is_selected(self):
+        for ram_id in (
+            'corsair-vengeance-ddr5',
+            'kingston-fury-ddr4',
+        ):
+            with self.subTest(ram_id=ram_id):
+                status, analysis = self.get_json(
+                    '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+                    f'&ramId={ram_id}'
+                )
+
+                self.assertEqual(status, 200)
+                self.assertEqual(analysis['level'], 'blocking')
+                self.assertIn('AM5', analysis['message'])
+                self.assertIn('LGA1700', analysis['message'])
+
+    def test_ram_analysis_requests_motherboard_and_memory_when_missing(self):
+        for query in (
+            'motherboardId=msi-b650',
+            'ramId=corsair-vengeance-ddr5',
+            'cpuId=ryzen-7-7800x3d&motherboardId=msi-b650&ramId=',
+        ):
+            with self.subTest(query=query):
+                status, analysis = self.get_json(f'/api/analyze?{query}')
+
+                self.assertEqual(status, 200)
+                self.assertEqual(analysis['level'], 'info')
+                self.assertIn('plyte glowna', analysis['message'])
+                self.assertIn('pamiec RAM', analysis['message'])
+
+    def test_ram_analysis_does_not_accept_unknown_identifiers(self):
+        for query in (
+            'motherboardId=msi-b650&ramId=unknown-ram',
+            'motherboardId=unknown-motherboard&ramId=corsair-vengeance-ddr5',
+        ):
+            with self.subTest(query=query):
+                status, analysis = self.get_json(f'/api/analyze?{query}')
+
+                self.assertEqual(status, 200)
+                self.assertNotIn(analysis['level'], ('ok', 'blocking'))
+
+    def test_page_refreshes_ram_analysis_with_selected_memory(self):
+        with Browser(self.base_url) as browser:
+            requests = browser.evaluate("""
+                (async () => {
+                    const requests = [];
+                    window.fetch = url => {
+                        requests.push(url);
+                        return Promise.resolve({
+                            json: () => Promise.resolve({level: 'ok', message: 'ok'})
+                        });
+                    };
+                    const motherboard = document.querySelector('#motherboard');
+                    const memory = document.querySelector('#memory');
+                    motherboard.value = 'msi-b650';
+                    memory.value = 'kingston-fury-ddr4';
+                    memory.dispatchEvent(new Event('change'));
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return requests;
+                })()
+            """)
+
+        self.assertEqual(len(requests), 1)
+        self.assertIn('motherboardId=msi-b650', requests[0])
+        self.assertIn('ramId=kingston-fury-ddr4', requests[0])
 
     def test_running_app_detects_incompatible_cpu_and_motherboard_socket(self):
         with urlopen(f'{self.base_url}/') as response:

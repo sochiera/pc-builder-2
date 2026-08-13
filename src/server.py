@@ -4,6 +4,8 @@ import os
 from urllib.parse import parse_qs, urlparse
 
 from src.analyze_build import analyze_build
+from src.analyze_build import combine_analyses
+from src.analyze_build import analyze_memory
 from src.analyze_build import analyze_products
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS
 
@@ -27,7 +29,7 @@ def page():
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
  <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
  <output id=result>Wybierz procesor i plyte glowna, aby sprawdzic socket.</output>
- <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),result=document.querySelector('#result');async function refresh(){const response=await fetch('/api/analyze?cpuId='+encodeURIComponent(cpu.value)+'&motherboardId='+encodeURIComponent(motherboard.value));const analysis=await response.json();result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh)</script>
+ <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),result=document.querySelector('#result');async function refresh(){const params=new URLSearchParams({cpuId:cpu.value,motherboardId:motherboard.value,ramId:memory.value});const response=await fetch('/api/analyze?'+params);const analysis=await response.json();result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh)</script>
 </main></body></html>'''
 
 
@@ -35,18 +37,40 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         request = urlparse(self.path)
         if request.path == '/api/analyze':
-            query = parse_qs(request.query)
-            if 'cpuId' in query or 'motherboardId' in query:
+            query = parse_qs(request.query, keep_blank_values=True)
+            value = lambda name: query.get(name, [''])[0]
+            if 'ramId' in query and 'cpuId' in query and 'motherboardId' in query:
+                socket_result = analyze_products(
+                    value('cpuId'),
+                    value('motherboardId'),
+                    CPUS,
+                    MOTHERBOARDS,
+                )
+                memory_result = analyze_memory(
+                    value('motherboardId'),
+                    value('ramId'),
+                    MOTHERBOARDS,
+                    MEMORY,
+                )
+                result = combine_analyses(socket_result, memory_result)
+            elif 'ramId' in query or ('motherboardId' in query and 'cpuId' not in query):
+                result = analyze_memory(
+                    value('motherboardId'),
+                    value('ramId'),
+                    MOTHERBOARDS,
+                    MEMORY,
+                )
+            elif 'cpuId' in query or 'motherboardId' in query:
                 result = analyze_products(
-                    query.get('cpuId', [''])[0],
-                    query.get('motherboardId', [''])[0],
+                    value('cpuId'),
+                    value('motherboardId'),
                     CPUS,
                     MOTHERBOARDS,
                 )
             else:
                 result = analyze_build(
-                    query.get('cpuSocket', [''])[0],
-                    query.get('motherboardSocket', [''])[0],
+                    value('cpuSocket'),
+                    value('motherboardSocket'),
                 )
             self.respond(200, 'application/json; charset=utf-8', json.dumps(result))
             return
