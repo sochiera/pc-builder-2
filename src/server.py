@@ -10,6 +10,7 @@ from src.analyze_build import analyze_memory
 from src.analyze_build import analyze_products
 from src.analyze_build import analyze_power_supply
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
+from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 
 
@@ -35,7 +36,7 @@ def page():
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
  <label for=memory>Pamiec RAM</label><select id=memory><option value>Wybierz pamiec RAM</option>''' + memory_options + '''</select>
   <label for=power-supply>Zasilacz</label><select id=power-supply><option value>Wybierz zasilacz</option>''' + power_supply_options + '''</select>
-   <output id=result>''' + RAM_ANALYSIS_REQUIRED_MESSAGE + '''</output>
+    <output id=result>''' + POWER_ANALYSIS_REQUIRED_MESSAGE + '''</output>
     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),result=document.querySelector('#result');let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level}cpu.addEventListener('change',refresh);motherboard.addEventListener('change',refresh);memory.addEventListener('change',refresh);powerSupply.addEventListener('change',refresh)</script>
 </main></body></html>'''
 

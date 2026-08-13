@@ -523,6 +523,54 @@ class AppTest(unittest.TestCase):
         self.assertIn('zasilacz', analysis['text'].lower())
         self.assertIn('Pamiec RAM DDR5 jest zgodna', analysis['text'])
 
+    def test_page_shows_power_status_before_and_after_power_supply_change(self):
+        weak_supply = {'id': 'test-weak-psu', 'name': 'Testowy zasilacz 100 W', 'power_watts': 100}
+        with patch('src.server.POWER_SUPPLIES', POWER_SUPPLIES + (weak_supply,)):
+            with Browser(self.base_url) as browser:
+                statuses = browser.evaluate("""
+                (async () => {
+                    const waitForResult = async (level, text) => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            const result = document.querySelector('#result');
+                            if (result.dataset.level === level && result.textContent.includes(text)) {
+                                return;
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        throw new Error(`Timed out waiting for ${level}: ${text}`);
+                    };
+                    const initial = {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    };
+                    document.querySelector('#cpu').value = 'ryzen-7-7800x3d';
+                    document.querySelector('#motherboard').value = 'msi-b650';
+                    document.querySelector('#memory').value = 'corsair-vengeance-ddr5';
+                    const powerSupply = document.querySelector('#power-supply');
+                    powerSupply.value = 'corsair-rm750x';
+                    powerSupply.dispatchEvent(new Event('change'));
+                    await waitForResult('ok', 'wystarczajaca');
+                    const sufficient = {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    };
+                    powerSupply.value = 'test-weak-psu';
+                    powerSupply.dispatchEvent(new Event('change'));
+                    await waitForResult('blocking', 'dostarcza 100 W');
+                    return {initial, sufficient, afterChange: {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    }};
+                })()
+                """)
+
+        self.assertIn('zasilacz', statuses['initial']['text'].lower())
+        self.assertEqual(statuses['sufficient']['level'], 'ok')
+        self.assertIn('wystarczajaca', statuses['sufficient']['text'])
+        self.assertEqual(statuses['afterChange']['level'], 'blocking')
+        self.assertIn('wymaga 210 W', statuses['afterChange']['text'])
+        self.assertIn('dostarcza 100 W', statuses['afterChange']['text'])
+
     def test_page_shows_ram_status_before_and_after_memory_change(self):
         with Browser(self.base_url) as browser:
             initial = browser.evaluate("document.querySelector('#result').textContent")
@@ -561,7 +609,7 @@ class AppTest(unittest.TestCase):
                 })()
             """)
 
-        self.assertIn('plyte glowna i pamiec RAM', initial)
+        self.assertIn('zasilacz', initial.lower())
         self.assertEqual(statuses['compatible']['level'], 'ok')
         self.assertIn('DDR5', statuses['compatible']['text'])
         self.assertIn('zgodna', statuses['compatible']['text'])
