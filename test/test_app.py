@@ -295,6 +295,16 @@ class AppTest(unittest.TestCase):
             self.assertEqual(analysis['level'], 'info')
             self.assertIn('znana plyte glowna i obudowe', analysis['message'])
 
+        with self.subTest('unknown motherboard'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=unknown-motherboard'
+                '&ramId=corsair-vengeance-ddr5&psuId=corsair-rm750x'
+                '&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'info')
+            self.assertIn('znana plyte glowna i obudowe', analysis['message'])
+
     def test_partial_case_analysis_uses_motherboard_and_case_without_other_parts(self):
         with self.subTest('compatible case'):
             status, analysis = self.get_json(
