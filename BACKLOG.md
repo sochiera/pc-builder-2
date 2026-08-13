@@ -23,3 +23,11 @@ Jako osoba składająca PC chcę dobrać zasilacz do wybranych części, żeby p
 - Dlaczego teraz: PROJECT.md wymaga uwzględnienia zasilania w ocenie zestawu, a żadna obecna historyjka nie pokrywa tego wymagania.
 - Sprawdzenie: uruchom demo, wybierz zestaw części oraz kolejno zasilacz o wystarczającej i niewystarczającej mocy, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
 - Poza zakresem: zgodność złączy, sprawność i jakość zasilacza, zapas mocy, ceny, montaż fizyczny oraz pozostałe kategorie części.
+
+## US-004 — Osoba składająca PC sprawdza dopasowanie płyty głównej do obudowy  [nowa]
+
+Jako osoba składająca PC chcę dobrać obudowę do wybranej płyty głównej, żeby przed zakupem zobaczyć, czy płyta zmieści się w obudowie.
+
+- Dlaczego teraz: PROJECT.md wskazuje fizyczny montaż obok reguł RAM i PSU jako prawdopodobny etap, a po objęciu RAM i zasilania jest to jedyny z tych trzech obszarów niepokryty historyjką.
+- Sprawdzenie: uruchom demo, wybierz płytę główną oraz kolejno pasującą i niepasującą obudowę, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
+- Poza zakresem: dopasowanie karty graficznej, chłodzenia i zasilacza, przepływ powietrza, złącza panelu obudowy, ceny oraz pozostałe zależności montażowe.
