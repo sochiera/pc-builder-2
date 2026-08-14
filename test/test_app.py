@@ -1264,10 +1264,12 @@ class AppTest(unittest.TestCase):
             with patch.object(server, 'CONFIGURATION_STORE', store):
                 with Browser(self.base_url) as browser:
                     status = browser.evaluate("""
-                        (async () => {
-                            const save = document.querySelector('#save-configuration');
-                            const identifier = document.querySelector('#configuration-id');
-                            if (!save || !identifier) return false;
+                     (async () => {
+                         const save = document.querySelector('#save-configuration');
+                         const identifier = document.querySelector('#configuration-id');
+                         const name = document.querySelector('#configuration-name');
+                         if (!save || !identifier || !name) return {controls: false};
+                         name.value = 'Wydajny zestaw do pracy';
                             document.querySelector('#cpu').value = 'ryzen-7-7800x3d';
                             document.querySelector('#motherboard').value = 'msi-b650';
                             document.querySelector('#memory').value = 'corsair-vengeance-ddr5';
@@ -1279,17 +1281,20 @@ class AppTest(unittest.TestCase):
                                 await new Promise(resolve => setTimeout(resolve, 10));
                             }
                             const response = await fetch('/api/configurations/' + identifier.textContent);
-                            return {
-                                id: identifier.textContent,
-                                status: response.status,
-                                saved: await response.json(),
+                             return {
+                                 controls: true,
+                                 id: identifier.textContent,
+                                 status: response.status,
+                                 saved: await response.json(),
                             };
                         })()
                     """)
 
         self.assertIsInstance(status, dict)
+        self.assertTrue(status['controls'], 'zapis udostepnia opisane pole nazwy')
         self.assertTrue(status['id'])
         self.assertEqual(status['status'], 200)
+        self.assertEqual(status['saved']['name'], 'Wydajny zestaw do pracy')
         self.assertEqual(status['saved']['parts'], {
             'cpuId': 'ryzen-7-7800x3d',
             'motherboardId': 'msi-b650',
@@ -1298,6 +1303,131 @@ class AppTest(unittest.TestCase):
             'caseId': 'atx-mid-tower',
         })
         self.assertEqual(status['saved']['budgetPln'], 5000)
+
+    def test_page_compares_named_configurations_after_app_restart(self):
+        first_payload = {
+            'name': 'Zestaw do pracy',
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+        second_payload = {
+            'name': 'Zestaw z konfliktem',
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'asus-z790',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                first_status, first_saved = self.post_json(
+                    '/api/configurations', first_payload
+                )
+                second_status, second_saved = self.post_json(
+                    '/api/configurations', second_payload
+                )
+                self.assertEqual(first_status, 201)
+                self.assertEqual(second_status, 201)
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with Browser(restarted_url) as browser:
+                        state = browser.evaluate(f"""
+                            (async () => {{
+                                const first = document.querySelector('#compare-first-id');
+                                const second = document.querySelector('#compare-second-id');
+                                const button = document.querySelector('#compare-configurations');
+                                const output = document.querySelector('#comparison-result');
+                                if (!first || !second || !button || !output) return false;
+                                first.value = '{first_saved['configuration_id']}';
+                                second.value = '{second_saved['configuration_id']}';
+                                button.click();
+                                for (let attempt = 0; attempt < 200; attempt++) {{
+                                    if (output.textContent.includes('Zestaw do pracy') &&
+                                        output.textContent.includes('Zestaw z konfliktem') &&
+                                        output.textContent.includes('Rekomendowany wariant: Zestaw do pracy') &&
+                                        !output.textContent.includes('Rekomendowany wariant: {first_saved['configuration_id']}')) return true;
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }}
+                                return false;
+                            }})()
+                        """)
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+        self.assertTrue(state, 'porownanie po restarcie pokazuje nazwy i rekomendacje')
+
+    def test_page_saves_configuration_without_empty_name(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const save = document.querySelector('#save-configuration');
+                    const name = document.querySelector('#configuration-name');
+                    let request;
+                    window.fetch = (url, options) => {
+                        request = JSON.parse(options.body);
+                        return Promise.resolve({
+                            ok: true,
+                            json: () => Promise.resolve({
+                                configuration_id: 'unnamed-config',
+                                share_url: '/api/configurations/unnamed-config',
+                            }),
+                        });
+                    };
+                    if (!save || !name) return {controls: false};
+                    save.click();
+                    for (let attempt = 0; attempt < 200 && !request; attempt++) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    return {controls: true, request};
+                })()
+            """)
+
+        self.assertTrue(state['controls'])
+        self.assertIsNotNone(state['request'])
+        self.assertNotIn('name', state['request'])
+
+    def test_page_escapes_script_closing_sequence_in_saved_name(self):
+        name = 'Zestaw </script><script>window.injected=true</script>'
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps({
+                'unsafe-config': {
+                    'name': name,
+                    'parts': {'cpuId': 'ryzen-7-7800x3d'},
+                },
+            }), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                request = Request(
+                    f'{self.base_url}/api/configurations/unsafe-config',
+                    headers={'Accept': 'text/html'},
+                )
+                with urlopen(request) as response:
+                    status = response.status
+                    html = response.read().decode()
+
+        self.assertEqual(status, 200)
+        self.assertIn(
+            'Zestaw <\\/script><script>window.injected=true<\\/script>',
+            html,
+        )
+        self.assertNotIn(
+            'Zestaw </script><script>window.injected=true</script>',
+            html,
+        )
 
     def test_share_url_opens_saved_configuration_in_a_new_page_session(self):
         with TemporaryDirectory() as directory:
@@ -1508,9 +1638,11 @@ class AppTest(unittest.TestCase):
                     const output = document.querySelector('#comparison-result');
                     const responses = new Map([
                          ['first-config|second-config', {
-                             first_configuration_id: 'first-config',
-                             second_configuration_id: 'second-config',
-                             recommended_configuration_id: 'first-config',
+                              first_configuration_id: 'first-config',
+                              second_configuration_id: 'second-config',
+                              first_configuration_name: 'Stacja robocza',
+                              second_configuration_name: 'Zestaw gamingowy',
+                              recommended_configuration_id: 'first-config',
                              first_cost_pln: 3975,
                             second_cost_pln: 3250,
                             cheaper: 'second',
@@ -1764,8 +1896,9 @@ class AppTest(unittest.TestCase):
                     second.value = 'second-config';
                     button.click();
                       const firstPair = await waitFor(() =>
-                         output.textContent.includes('3975 PLN') &&
-                         output.textContent.includes('3250 PLN') &&
+                          output.textContent.includes('Stacja robocza: 3975 PLN') &&
+                          output.textContent.includes('Zestaw gamingowy: 3250 PLN') &&
+                          output.textContent.includes('3250 PLN') &&
                         output.textContent.toLowerCase().includes('second') &&
                         output.textContent.includes('AMD Ryzen 7 7800X3D') &&
                         output.textContent.includes('Intel Core i5-14600K') &&
@@ -1776,7 +1909,8 @@ class AppTest(unittest.TestCase):
                       const missingCostRecommendation = await waitFor(() =>
                           !output.textContent.includes('Rekomendowany wariant kosztowy:')
                       );
-                      const firstRecommendation = output.textContent.includes('Rekomendowany wariant: first-config');
+                       const firstRecommendation = output.textContent.includes('Rekomendowany wariant: Stacja robocza') &&
+                           !output.textContent.includes('Rekomendowany wariant: first-config');
                      const firstCompatibility = await waitFor(() =>
                          output.textContent.includes('Pierwszy wariant: ok') &&
                          output.textContent.includes('Drugi wariant: blocking') &&
@@ -1793,54 +1927,54 @@ class AppTest(unittest.TestCase):
                      first.value = 'second-config';
                      second.value = 'first-config';
                      button.click();
-                      const reversedRecommendation = await waitFor(() =>
-                          output.textContent.includes('Rekomendowany wariant: first-config')
-                      );
+                       const reversedRecommendation = await waitFor(() =>
+                           !output.textContent.includes('Rekomendowany wariant:')
+                       );
                       first.value = 'within-budget';
                       second.value = 'over-budget';
                       button.click();
-                       const budgetRecommendation = await waitFor(() =>
-                           output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
-                       );
+                        const budgetRecommendation = await waitFor(() =>
+                            !output.textContent.includes('Rekomendowany wariant budzetowy:')
+                        );
                        const nullCostRecommendation = await waitFor(() =>
                            !output.textContent.includes('Rekomendowany wariant kosztowy:')
                        );
                        first.value = 'over-budget';
                        second.value = 'within-budget';
                        button.click();
-                       const reversedBudgetRecommendation = await waitFor(() =>
-                          output.textContent.includes('over-budget: 3975 PLN') &&
-                          output.textContent.includes('within-budget: 3250 PLN') &&
-                           output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
-                       );
+                        const reversedBudgetRecommendation = await waitFor(() =>
+                           output.textContent.includes('over-budget: 3975 PLN') &&
+                           output.textContent.includes('within-budget: 3250 PLN') &&
+                            !output.textContent.includes('Rekomendowany wariant budzetowy:')
+                        );
                        first.value = 'both-within';
                        second.value = 'also-within';
                        button.click();
-                        const bothWithinNoBudgetRecommendation = await waitFor(() =>
-                            output.textContent.includes('both-within: 3250 PLN') &&
-                            output.textContent.includes('also-within: 3000 PLN') &&
-                            output.textContent.includes('Tanszy: second') &&
-                            output.textContent.includes('Rekomendowany wariant kosztowy: also-within') &&
-                            !output.textContent.includes('Rekomendowany wariant:') &&
-                            !output.textContent.includes('Rekomendowany wariant budzetowy:')
-                        );
+                         const bothWithinNoBudgetRecommendation = await waitFor(() =>
+                             output.textContent.includes('both-within: 3250 PLN') &&
+                             output.textContent.includes('also-within: 3000 PLN') &&
+                             output.textContent.includes('Tanszy: second') &&
+                             !output.textContent.includes('Rekomendowany wariant kosztowy:') &&
+                             !output.textContent.includes('Rekomendowany wariant:') &&
+                             !output.textContent.includes('Rekomendowany wariant budzetowy:')
+                         );
                         first.value = 'also-within';
                         second.value = 'both-within';
                         button.click();
                         const reversedCostRecommendation = await waitFor(() =>
-                            output.textContent.includes('also-within: 3000 PLN') &&
-                            output.textContent.includes('both-within: 3250 PLN') &&
-                            output.textContent.includes('Tanszy: first') &&
-                            output.textContent.includes('Rekomendowany wariant kosztowy: also-within')
-                        );
+                             output.textContent.includes('also-within: 3000 PLN') &&
+                             output.textContent.includes('both-within: 3250 PLN') &&
+                             output.textContent.includes('Tanszy: first') &&
+                             !output.textContent.includes('Rekomendowany wariant kosztowy:')
+                         );
                        first.value = 'blocking';
                        second.value = 'within-budget';
                        button.click();
-                       const blockingNoBudgetRecommendation = await waitFor(() =>
-                           output.textContent.includes('blocking: 3975 PLN') &&
-                           output.textContent.includes('Rekomendowany wariant: within-budget') &&
-                           !output.textContent.includes('Rekomendowany wariant budzetowy:')
-                       );
+                        const blockingNoBudgetRecommendation = await waitFor(() =>
+                            output.textContent.includes('blocking: 3975 PLN') &&
+                            !output.textContent.includes('Rekomendowany wariant:') &&
+                            !output.textContent.includes('Rekomendowany wariant budzetowy:')
+                        );
                       first.value = 'first-config';
                      second.value = 'tie-config';
                      button.click();

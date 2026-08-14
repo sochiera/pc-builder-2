@@ -1,6 +1,6 @@
 # Backlog
 
-## US-017 — Osoba składająca PC rozpoznaje nazwane warianty w porównaniu  [w toku]
+## US-017 — Osoba składająca PC rozpoznaje nazwane warianty w porównaniu  [do weryfikacji]
 
 Jako osoba składająca PC chcę nadać nazwy zapisanym zestawom i widzieć je podczas porównania, żeby łatwo rozpoznać warianty oraz rekomendowany wybór.
 
