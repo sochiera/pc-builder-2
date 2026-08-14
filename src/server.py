@@ -337,7 +337,7 @@ def _page_template():
          </main></body></html>'''
     return html.replace(
         "return comparison.first_configuration_id",
-        "return (comparison.recommended_configuration_id === null || comparison.recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant: ' + comparison.recommended_configuration_id + ' | ') + (comparison.budget_recommended_configuration_id === null || comparison.budget_recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant budzetowy: ' + comparison.budget_recommended_configuration_id + ' | ') + comparison.first_configuration_id",
+         "return (comparison.recommended_configuration_id === null || comparison.recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant: ' + comparison.recommended_configuration_id + ' | ') + (comparison.budget_recommended_configuration_id === null || comparison.budget_recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant budzetowy: ' + comparison.budget_recommended_configuration_id + ' | ') + (comparison.cost_recommended_configuration_id === null || comparison.cost_recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant kosztowy: ' + comparison.cost_recommended_configuration_id + ' | ') + comparison.first_configuration_id",
     )
 
 
