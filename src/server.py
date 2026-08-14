@@ -67,6 +67,30 @@ def with_configuration_share_url(configuration_id, configuration):
     return shared
 
 
+def configuration_cost(configuration):
+    parts = configuration.get('parts', {})
+    return total_cost(
+        tuple(parts.get(field, '') for field in CONFIGURATION_CATALOGS),
+        tuple(CONFIGURATION_CATALOGS.values()),
+    )
+
+
+def compare_configuration_costs(first_id, first, second_id, second):
+    first_cost = configuration_cost(first)
+    second_cost = configuration_cost(second)
+    return {
+        'first_configuration_id': first_id,
+        'second_configuration_id': second_id,
+        'first_cost_pln': first_cost,
+        'second_cost_pln': second_cost,
+        'cheaper': (
+            'first' if first_cost < second_cost else
+            'second' if second_cost < first_cost else
+            'tie'
+        ),
+    }
+
+
 def normalize_budget(value):
     if isinstance(value, str) and value.isascii() and value.isdecimal():
         try:
@@ -224,6 +248,30 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         request = urlparse(self.path)
+        if request.path == '/api/compare':
+            query = parse_qs(request.query, keep_blank_values=True)
+            first_id = query.get('firstId', [''])[0]
+            second_id = query.get('secondId', [''])[0]
+            configurations = load_configurations()
+            if not first_id or not second_id or first_id == second_id:
+                self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                    'error': 'Podaj dwa rozne identyfikatory konfiguracji.',
+                }))
+                return
+
+            first = configurations.get(first_id)
+            second = configurations.get(second_id)
+            if first is None or second is None:
+                self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                    'error': 'Nie znaleziono obu konfiguracji do porownania.',
+                }))
+                return
+
+            comparison = compare_configuration_costs(
+                first_id, first, second_id, second
+            )
+            self.respond(200, 'application/json; charset=utf-8', json.dumps(comparison))
+            return
         configuration_prefix = '/api/configurations/'
         if request.path.startswith(configuration_prefix):
             configuration_id = unquote(request.path[len(configuration_prefix):])

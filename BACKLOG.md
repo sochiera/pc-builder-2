@@ -64,7 +64,7 @@ Jako osoba składająca PC chcę przekazać zapisany zestaw drugiej osobie, żeb
 - Sprawdzenie: uruchom demo, zapisz zestaw, przekaż uzyskany odnośnik drugiej osobie i potwierdź w osobnej sesji, że otwiera on te same części, budżet i widoczne oceny.
 - Poza zakresem: konta użytkowników, uprawnienia dostępu, wspólna edycja, wygasanie odnośników, media społecznościowe i porównywanie wariantów.
 
-## US-009 — Osoba składająca PC porównuje koszt dwóch zapisanych zestawów  [nowa]
+## US-009 — Osoba składająca PC porównuje koszt dwóch zapisanych zestawów  [w toku]
 
 Jako osoba składająca PC chcę zestawić koszty dwóch zapisanych konfiguracji, żeby łatwo wybrać tańszy wariant.
 

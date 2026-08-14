@@ -302,6 +302,70 @@ class AppTest(unittest.TestCase):
                         self.assertIn(expected_error, response.get('error', ''))
                         self.assertEqual(store.read_bytes(), before)
 
+    def test_compare_configurations_returns_costs_and_cheapest_or_tie(self):
+        configurations = {
+            'first-config': {
+                'configuration_id': 'first-config',
+                'parts': {'cpuId': 'ryzen-7-7800x3d'},
+            },
+            'second-config': {
+                'configuration_id': 'second-config',
+                'parts': {'cpuId': 'core-i5-14600k'},
+            },
+            'tie-config': {
+                'configuration_id': 'tie-config',
+                'parts': {'cpuId': 'ryzen-7-7800x3d'},
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=first-config&secondId=second-config'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(comparison['first_configuration_id'], 'first-config')
+                self.assertEqual(comparison['second_configuration_id'], 'second-config')
+                self.assertEqual(comparison['first_cost_pln'], 1599)
+                self.assertEqual(comparison['second_cost_pln'], 1249)
+                self.assertEqual(comparison['cheaper'], 'second')
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=first-config&secondId=tie-config'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(comparison['first_cost_pln'], 1599)
+                self.assertEqual(comparison['second_cost_pln'], 1599)
+                self.assertEqual(comparison['cheaper'], 'tie')
+
+            self.assertEqual(json.loads(store.read_text(encoding='utf-8')), configurations)
+
+    def test_compare_configurations_rejects_missing_or_duplicate_ids_without_partial_result(self):
+        configurations = {
+            'saved-config': {
+                'configuration_id': 'saved-config',
+                'parts': {'cpuId': 'ryzen-7-7800x3d'},
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                for query in (
+                    'firstId=saved-config&secondId=does-not-exist',
+                    'firstId=does-not-exist&secondId=saved-config',
+                    'firstId=saved-config&secondId=saved-config',
+                ):
+                    with self.subTest(query=query):
+                        status, response = self.get_json('/api/compare?' + query)
+                        self.assertEqual(status, 400)
+                        self.assertIn('error', response)
+                        self.assertNotIn('first_cost_pln', response)
+                        self.assertNotIn('second_cost_pln', response)
+
     def test_catalog_exposes_named_products_with_stable_identifiers(self):
         with urlopen(self.base_url) as response:
             page = response.read().decode()
