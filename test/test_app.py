@@ -186,6 +186,12 @@ class AppTest(unittest.TestCase):
             'caseId': 'atx-mid-tower',
         })
         self.assertEqual(saved.get('budgetPln'), 5000)
+        first_configuration_id = saved['configuration_id']
+        first_share_url = saved.get('share_url')
+        self.assertEqual(first_share_url, f'/api/configurations/{first_configuration_id}')
+        status, shared = self.get_json(first_share_url)
+        self.assertEqual(status, 200)
+        self.assertEqual(shared['configuration_id'], first_configuration_id)
 
         status, saved = self.post_json('/api/configurations', {
             'cpuId': 'core-i5-14600k',
@@ -195,6 +201,11 @@ class AppTest(unittest.TestCase):
         self.assertTrue(saved.get('configuration_id'))
         self.assertEqual(saved.get('parts'), {'cpuId': 'core-i5-14600k'})
         self.assertNotIn('budgetPln', saved)
+        self.assertEqual(
+            saved.get('share_url'),
+            f"/api/configurations/{saved['configuration_id']}",
+        )
+        self.assertNotEqual(saved['share_url'], first_share_url)
 
     def test_configuration_can_be_opened_after_save_and_app_restart(self):
         payload = {
@@ -208,10 +219,12 @@ class AppTest(unittest.TestCase):
 
         status, saved = self.post_json('/api/configurations', payload)
         self.assertEqual(status, 201)
-
-        status, opened = self.get_json(
-            f"/api/configurations/{saved['configuration_id']}"
+        self.assertEqual(
+            saved['share_url'],
+            f"/api/configurations/{saved['configuration_id']}",
         )
+
+        status, opened = self.get_json(saved['share_url'])
         self.assertEqual(status, 200)
         self.assertEqual(opened['configuration_id'], saved['configuration_id'])
         self.assertEqual(
@@ -219,7 +232,9 @@ class AppTest(unittest.TestCase):
             {key: value for key, value in payload.items() if key != 'budgetPln'},
         )
         self.assertEqual(opened['budgetPln'], payload['budgetPln'])
+        self.assertTrue(opened.get('share_url'))
         self.assertEqual(opened, saved)
+        self.assertEqual(opened['share_url'], saved['share_url'])
 
         restarted_app = create_app(port=0)
         restarted_thread = Thread(target=restarted_app.serve_forever)
@@ -239,6 +254,30 @@ class AppTest(unittest.TestCase):
         status, missing = self.get_json('/api/configurations/does-not-exist')
         self.assertEqual(status, 404)
         self.assertEqual(missing, {'error': 'Nie znaleziono konfiguracji.'})
+
+    def test_configuration_open_adds_share_url_to_legacy_record(self):
+        configuration_id = 'legacy-config-123'
+        legacy = {
+            configuration_id: {
+                'configuration_id': configuration_id,
+                'parts': {'cpuId': 'core-i5-14600k'},
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(legacy), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, opened = self.get_json(
+                    f'/api/configurations/{configuration_id}'
+                )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(opened, {
+            'configuration_id': configuration_id,
+            'parts': {'cpuId': 'core-i5-14600k'},
+            'share_url': f'/api/configurations/{configuration_id}',
+        })
 
     def test_configuration_save_rejects_invalid_parts_and_budget_without_creating_one(self):
         invalid_payloads = (

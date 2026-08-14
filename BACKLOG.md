@@ -56,7 +56,7 @@ Jako osoba składająca PC chcę zapisać aktualny zestaw i później otworzyć 
 - Sprawdzenie: uruchom demo, wybierz części i budżet, zapisz zestaw, uruchom demo ponownie i potwierdź, że otwarty zestaw zawiera te same wybory oraz budżet.
 - Poza zakresem: konta użytkowników, lista wielu zapisów, edycja nazwy, udostępnianie, porównywanie wariantów i synchronizacja między urządzeniami.
 
-## US-008 — Osoba składająca PC udostępnia zapisany zestaw  [nowa]
+## US-008 — Osoba składająca PC udostępnia zapisany zestaw  [w toku]
 
 Jako osoba składająca PC chcę przekazać zapisany zestaw drugiej osobie, żeby mogła zobaczyć te same części, budżet i oceny.
 

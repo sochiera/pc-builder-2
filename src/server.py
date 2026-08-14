@@ -55,6 +55,10 @@ def save_configuration(configuration_id, configuration):
         temporary_store.replace(CONFIGURATION_STORE)
 
 
+def configuration_share_url(configuration_id):
+    return f'/api/configurations/{configuration_id}'
+
+
 def normalize_budget(value):
     if isinstance(value, str) and value.isascii() and value.isdecimal():
         try:
@@ -178,7 +182,11 @@ class AppHandler(BaseHTTPRequestHandler):
             return
 
         configuration_id = uuid4().hex
-        saved = {'configuration_id': configuration_id, 'parts': parts}
+        saved = {
+            'configuration_id': configuration_id,
+            'parts': parts,
+            'share_url': configuration_share_url(configuration_id),
+        }
         if 'budgetPln' in payload:
             saved['budgetPln'] = budget
         self.server.configurations[configuration_id] = saved
@@ -196,6 +204,9 @@ class AppHandler(BaseHTTPRequestHandler):
                     'error': 'Nie znaleziono konfiguracji.',
                 }))
                 return
+            if 'share_url' not in saved:
+                saved = dict(saved)
+                saved['share_url'] = configuration_share_url(configuration_id)
             self.respond(200, 'application/json; charset=utf-8', json.dumps(saved))
             return
         if request.path == '/api/analyze':
