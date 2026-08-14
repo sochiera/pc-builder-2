@@ -342,6 +342,119 @@ class AppTest(unittest.TestCase):
 
             self.assertEqual(json.loads(store.read_text(encoding='utf-8')), configurations)
 
+    def test_compare_configurations_recommends_cheaper_equally_safe_variant(self):
+        configurations = {
+            'expensive-safe': {
+                'configuration_id': 'expensive-safe',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'cheap-safe': {
+                'configuration_id': 'cheap-safe',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'cheap-safe-copy': {
+                'configuration_id': 'cheap-safe-copy',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'blocking-expensive': {
+                'configuration_id': 'blocking-expensive',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'cheap-different-budget': {
+                'configuration_id': 'cheap-different-budget',
+                'budgetPln': 1,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=expensive-safe&secondId=cheap-safe'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('recommends the cheaper equally safe variant'):
+                    self.assertEqual(
+                        comparison.get('cost_recommended_configuration_id'),
+                        'cheap-safe',
+                    )
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=cheap-safe&secondId=expensive-safe'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('keeps recommendation after swapping variants'):
+                    self.assertEqual(
+                        comparison.get('cost_recommended_configuration_id'),
+                        'cheap-safe',
+                    )
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=cheap-safe&secondId=cheap-safe-copy'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('does not recommend a tied cost'):
+                    self.assertIn('cost_recommended_configuration_id', comparison)
+                    self.assertIsNone(comparison['cost_recommended_configuration_id'])
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=blocking-expensive&secondId=cheap-safe'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('does not recommend when a variant has a blocking conflict'):
+                    self.assertNotEqual(comparison['first_cost_pln'], comparison['second_cost_pln'])
+                    self.assertEqual(comparison['first_compatibility']['level'], 'blocking')
+                    self.assertIn('cost_recommended_configuration_id', comparison)
+                    self.assertIsNone(comparison['cost_recommended_configuration_id'])
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=expensive-safe&secondId=cheap-different-budget'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('does not recommend when budget levels differ'):
+                    self.assertNotEqual(comparison['first_cost_pln'], comparison['second_cost_pln'])
+                    self.assertNotEqual(
+                        comparison['first_budget']['level'], comparison['second_budget']['level']
+                    )
+                    self.assertIn('cost_recommended_configuration_id', comparison)
+                    self.assertIsNone(comparison['cost_recommended_configuration_id'])
+
     def test_compare_configurations_reports_compatibility_for_each_variant(self):
         configurations = {
             'compatible-config': {

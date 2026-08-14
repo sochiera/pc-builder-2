@@ -1,6 +1,6 @@
 # Backlog
 
-## US-016 — Osoba składająca PC wybiera tańszy z równie bezpiecznych wariantów  [nowa]
+## US-016 — Osoba składająca PC wybiera tańszy z równie bezpiecznych wariantów  [w toku]
 
 Jako osoba składająca PC chcę przy porównaniu równie bezpiecznych zestawów zobaczyć wskazanie tańszego wariantu, żeby ograniczyć koszt bez rezygnacji ze zgodności ani budżetu.
 

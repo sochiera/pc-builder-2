@@ -205,6 +205,17 @@ def budget_recommendation(first_id, first_budget, second_id, second_budget,
                 if budget['level'] == 'ok')
 
 
+def cost_recommendation(first_id, first_cost, first_compatibility, first_budget,
+                        second_id, second_cost, second_compatibility, second_budget):
+    if 'blocking' in (first_compatibility['level'], second_compatibility['level']):
+        return None
+    if first_budget['level'] != second_budget['level']:
+        return None
+    if first_cost == second_cost:
+        return None
+    return first_id if first_cost < second_cost else second_id
+
+
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
@@ -212,6 +223,16 @@ def compare_configuration_costs(first_id, first, second_id, second):
     second_compatibility = configuration_compatibility(second)
     first_budget = configuration_budget(first, first_cost)
     second_budget = configuration_budget(second, second_cost)
+    cost_recommended_configuration_id = cost_recommendation(
+        first_id,
+        first_cost,
+        first_compatibility,
+        first_budget,
+        second_id,
+        second_cost,
+        second_compatibility,
+        second_budget,
+    )
     recommended_configuration_id = None
     if first_compatibility['level'] == 'blocking' and second_compatibility['level'] != 'blocking':
         recommended_configuration_id = second_id
@@ -242,6 +263,7 @@ def compare_configuration_costs(first_id, first, second_id, second):
         'second_budget': second_budget,
         'recommended_configuration_id': recommended_configuration_id,
         'budget_recommended_configuration_id': budget_recommended_configuration_id,
+        'cost_recommended_configuration_id': cost_recommended_configuration_id,
     }
 
 
