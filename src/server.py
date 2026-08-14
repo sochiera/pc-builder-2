@@ -20,6 +20,7 @@ from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import INITIAL_ANALYSIS_REQUIRED_MESSAGE
 from src.catalog import CASES, CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
+from src.catalog import find_product
 
 
 CONFIGURATION_CATALOGS = {
@@ -82,10 +83,23 @@ def configuration_differences(first, second):
         field: {
             'first_id': first_parts.get(field),
             'second_id': second_parts.get(field),
+            'first_price_pln': configuration_part_price(field, first_parts.get(field)),
+            'second_price_pln': configuration_part_price(field, second_parts.get(field)),
+            'price_difference_pln': (
+                configuration_part_price(field, first_parts.get(field))
+                - configuration_part_price(field, second_parts.get(field))
+            ),
         }
         for field in CONFIGURATION_CATALOGS
         if first_parts.get(field) != second_parts.get(field)
     }
+
+
+def configuration_part_price(field, product_id):
+    if not product_id:
+        return 0
+    product = find_product(CONFIGURATION_CATALOGS[field], product_id)
+    return product['price_pln'] if product is not None else 0
 
 
 def compare_configuration_costs(first_id, first, second_id, second):

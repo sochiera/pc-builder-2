@@ -373,12 +373,71 @@ class AppTest(unittest.TestCase):
         self.assertEqual(comparison.get('differences', {}).get('cpuId'), {
             'first_id': 'ryzen-7-7800x3d',
             'second_id': 'core-i5-14600k',
+            'first_price_pln': 1599,
+            'second_price_pln': 1249,
+            'price_difference_pln': 350,
         })
         self.assertEqual(comparison.get('differences', {}).get('motherboardId'), {
             'first_id': 'msi-b650',
             'second_id': None,
+            'first_price_pln': 899,
+            'second_price_pln': 0,
+            'price_difference_pln': 899,
         })
         self.assertNotIn('ramId', comparison.get('differences', {}))
+
+    def test_compare_configurations_reports_prices_for_different_parts(self):
+        configurations = {
+            'first-config': {
+                'configuration_id': 'first-config',
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+            'second-config': {
+                'configuration_id': 'second-config',
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=first-config&secondId=second-config'
+                )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(comparison['first_configuration_id'], 'first-config')
+        self.assertEqual(comparison['second_configuration_id'], 'second-config')
+        self.assertEqual(comparison['first_cost_pln'], 3027)
+        self.assertEqual(comparison['second_cost_pln'], 1778)
+        self.assertEqual(comparison['cheaper'], 'second')
+        differences = comparison['differences']
+        with self.subTest(part='different selection'):
+            self.assertEqual(differences['cpuId'], {
+                'first_id': 'ryzen-7-7800x3d',
+                'second_id': 'core-i5-14600k',
+                'first_price_pln': 1599,
+                'second_price_pln': 1249,
+                'price_difference_pln': 350,
+            })
+        with self.subTest(part='missing selection'):
+            self.assertEqual(differences['motherboardId'], {
+                'first_id': 'msi-b650',
+                'second_id': None,
+                'first_price_pln': 899,
+                'second_price_pln': 0,
+                'price_difference_pln': 899,
+            })
+        with self.subTest(part='shared selection'):
+            self.assertNotIn('ramId', differences)
 
     def test_compare_configurations_rejects_missing_or_duplicate_ids_without_partial_result(self):
         configurations = {
