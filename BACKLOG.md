@@ -1,6 +1,6 @@
 # Backlog
 
-## US-019 — Osoba składająca PC wybiera nazwane zestawy do porównania  [nowa]
+## US-019 — Osoba składająca PC wybiera nazwane zestawy do porównania  [w toku]
 
 Jako osoba składająca PC chcę wskazać dwa nazwane zestawy z listy zapisanych wariantów, żeby porównać je bez pamiętania ich technicznych identyfikatorów.
 

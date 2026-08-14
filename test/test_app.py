@@ -1553,6 +1553,71 @@ class AppTest(unittest.TestCase):
         self.assertIn('Plyta w formacie ATX pasuje do obudowy.', state['states'][1]['result'])
         self.assertIn('825 PLN', state['states'][1]['budgetResult'])
 
+    def test_page_provides_two_named_configuration_choices_after_restart(self):
+        payloads = [
+            {
+                'name': 'Zestaw do pracy',
+                'cpuId': 'ryzen-7-7800x3d',
+                'motherboardId': 'msi-b650',
+            },
+            {
+                'name': 'Zestaw gamingowy',
+                'cpuId': 'core-i5-14600k',
+                'motherboardId': 'asus-z790',
+            },
+        ]
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                saved = []
+                for payload in payloads:
+                    status, configuration = self.post_json('/api/configurations', payload)
+                    self.assertEqual(status, 201)
+                    saved.append(configuration)
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with Browser(restarted_url) as browser:
+                        state = browser.evaluate(f"""
+                            (async () => {{
+                                const first = document.querySelector('#compare-first-id');
+                                const second = document.querySelector('#compare-second-id');
+                                const firstLabel = document.querySelector('label[for="compare-first-id"]');
+                                const secondLabel = document.querySelector('label[for="compare-second-id"]');
+                                for (let attempt = 0; attempt < 200 &&
+                                    (!first?.querySelector('option[value="{saved[0]['configuration_id']}"]') ||
+                                     !second?.querySelector('option[value="{saved[1]['configuration_id']}"]')); attempt++) {{
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }}
+                                return {{
+                                    firstTag: first?.tagName,
+                                    secondTag: second?.tagName,
+                                    firstLabel: firstLabel?.textContent,
+                                    secondLabel: secondLabel?.textContent,
+                                    firstNames: [...(first?.options || [])].map(option => option.textContent),
+                                    secondNames: [...(second?.options || [])].map(option => option.textContent),
+                                }};
+                            }})()
+                        """)
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+        self.assertEqual(state['firstTag'], 'SELECT')
+        self.assertEqual(state['secondTag'], 'SELECT')
+        self.assertIn('Pierwszy wariant', state['firstLabel'])
+        self.assertIn('Drugi wariant', state['secondLabel'])
+        self.assertIn('Zestaw do pracy', state['firstNames'])
+        self.assertIn('Zestaw gamingowy', state['firstNames'])
+        self.assertIn('Zestaw do pracy', state['secondNames'])
+        self.assertIn('Zestaw gamingowy', state['secondNames'])
+
     def test_page_communicates_empty_named_configuration_list(self):
         with TemporaryDirectory() as directory:
             store = Path(directory) / 'configurations.json'
@@ -1562,17 +1627,26 @@ class AppTest(unittest.TestCase):
                     state = browser.evaluate("""
                         (async () => {
                             const list = document.querySelector('#saved-configurations');
+                            const first = document.querySelector('#compare-first-id');
+                            const second = document.querySelector('#compare-second-id');
                             if (!list) return {list: false};
                             for (let attempt = 0; attempt < 200 &&
                                 list.textContent.includes('Wczytywanie'); attempt++) {
                                 await new Promise(resolve => setTimeout(resolve, 10));
                             }
-                            return {list: true, text: list.textContent};
+                            return {
+                                list: true,
+                                text: list.textContent,
+                                firstComparisonText: first?.textContent,
+                                secondComparisonText: second?.textContent,
+                            };
                         })()
                     """)
 
         self.assertTrue(state['list'])
         self.assertIn('Brak nazwanych zapisow do wyboru.', state['text'])
+        self.assertIn('Brak nazwanych zapisow do porownania', state['firstComparisonText'])
+        self.assertIn('Brak nazwanych zapisow do porownania', state['secondComparisonText'])
 
     def test_page_opens_named_configuration_from_keyboard_control(self):
         payload = {
@@ -2145,6 +2219,10 @@ class AppTest(unittest.TestCase):
                         tie: false,
                     };
 
+                    ['first-config', 'second-config', 'within-budget', 'over-budget',
+                     'both-within', 'also-within', 'blocking', 'tie-config']
+                        .forEach(id => [first, second].forEach(select =>
+                            select.add(new Option(id, id))));
                     first.value = 'first-config';
                     second.value = 'second-config';
                     button.click();
@@ -2409,6 +2487,8 @@ class AppTest(unittest.TestCase):
                     if (!first || !second || !button || !output) {
                         return {controls: false, named: false, missing: false, shared: false};
                     }
+                    ['first-config', 'second-config'].forEach(id =>
+                        [first, second].forEach(select => select.add(new Option(id, id))));
                     first.value = 'first-config';
                     second.value = 'second-config';
                     button.click();
