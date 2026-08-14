@@ -1239,7 +1239,7 @@ class AppTest(unittest.TestCase):
                               },
                               differences: {},
                           }],
-                          ['over-budget|within-budget', {
+                           ['over-budget|within-budget', {
                               first_configuration_id: 'over-budget',
                               second_configuration_id: 'within-budget',
                               recommended_configuration_id: null,
@@ -1263,9 +1263,61 @@ class AppTest(unittest.TestCase):
                                   level: 'ok',
                                   message: 'Budzet wystarcza; pozostaje 1750 PLN.',
                               },
-                              differences: {},
-                          }],
-                      ]);
+                               differences: {},
+                           }],
+                           ['both-within|also-within', {
+                               first_configuration_id: 'both-within',
+                               second_configuration_id: 'also-within',
+                               recommended_configuration_id: null,
+                               budget_recommended_configuration_id: null,
+                               first_cost_pln: 3250,
+                               second_cost_pln: 3000,
+                               cheaper: 'second',
+                               first_compatibility: {
+                                   level: 'ok',
+                                   message: 'Pierwszy zestaw jest zgodny.',
+                               },
+                               first_budget: {
+                                   level: 'ok',
+                                   message: 'Budzet wystarcza; pozostaje 1750 PLN.',
+                               },
+                               second_compatibility: {
+                                   level: 'ok',
+                                   message: 'Drugi zestaw jest zgodny.',
+                               },
+                               second_budget: {
+                                   level: 'ok',
+                                   message: 'Budzet wystarcza; pozostaje 2000 PLN.',
+                               },
+                               differences: {},
+                           }],
+                           ['blocking|within-budget', {
+                               first_configuration_id: 'blocking',
+                               second_configuration_id: 'within-budget',
+                               recommended_configuration_id: 'within-budget',
+                               budget_recommended_configuration_id: null,
+                               first_cost_pln: 3975,
+                               second_cost_pln: 3250,
+                               cheaper: 'second',
+                               first_compatibility: {
+                                   level: 'blocking',
+                                   message: 'Pierwszy zestaw ma konflikt socketu.',
+                               },
+                               first_budget: {
+                                   level: 'ok',
+                                   message: 'Budzet wystarcza; pozostaje 1025 PLN.',
+                               },
+                               second_compatibility: {
+                                   level: 'ok',
+                                   message: 'Drugi zestaw jest zgodny.',
+                               },
+                               second_budget: {
+                                   level: 'ok',
+                                   message: 'Budzet wystarcza; pozostaje 1750 PLN.',
+                               },
+                               differences: {},
+                           }],
+                       ]);
                     window.fetch = url => {
                         const query = new URL(url, window.location).searchParams;
                         const key = query.get('firstId') + '|' + query.get('secondId');
@@ -1339,7 +1391,23 @@ class AppTest(unittest.TestCase):
                        const reversedBudgetRecommendation = await waitFor(() =>
                           output.textContent.includes('over-budget: 3975 PLN') &&
                           output.textContent.includes('within-budget: 3250 PLN') &&
-                          output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
+                           output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
+                       );
+                       first.value = 'both-within';
+                       second.value = 'also-within';
+                       button.click();
+                       const bothWithinNoBudgetRecommendation = await waitFor(() =>
+                           output.textContent.includes('both-within: 3250 PLN') &&
+                           output.textContent.includes('also-within: 3000 PLN') &&
+                           !output.textContent.includes('Rekomendowany wariant budzetowy:')
+                       );
+                       first.value = 'blocking';
+                       second.value = 'within-budget';
+                       button.click();
+                       const blockingNoBudgetRecommendation = await waitFor(() =>
+                           output.textContent.includes('blocking: 3975 PLN') &&
+                           output.textContent.includes('Rekomendowany wariant: within-budget') &&
+                           !output.textContent.includes('Rekomendowany wariant budzetowy:')
                        );
                       first.value = 'first-config';
                      second.value = 'tie-config';
@@ -1390,9 +1458,11 @@ class AppTest(unittest.TestCase):
                          firstPair,
                          firstRecommendation,
                           reversedRecommendation,
-                          budgetRecommendation,
+                         budgetRecommendation,
                           reversedBudgetRecommendation,
-                          noRecommendation,
+                         bothWithinNoBudgetRecommendation,
+                         blockingNoBudgetRecommendation,
+                         noRecommendation,
                         firstCompatibility,
                         firstBudget,
                         secondBudget,
@@ -1422,6 +1492,14 @@ class AppTest(unittest.TestCase):
         self.assertTrue(
             state['reversedBudgetRecommendation'],
             'porownanie pokazuje rekomendacje budzetowa po odwroceniu wariantow',
+        )
+        self.assertTrue(
+            state['bothWithinNoBudgetRecommendation'],
+            'porownanie nie oglasza rekomendacji budzetowej gdy oba warianty mieszcza sie w budzecie',
+        )
+        self.assertTrue(
+            state['blockingNoBudgetRecommendation'],
+            'porownanie nie oglasza rekomendacji budzetowej przy konflikcie blokujacym',
         )
         self.assertTrue(
             state['noRecommendation'],

@@ -1,6 +1,6 @@
 # Backlog
 
-## US-015 — Osoba składająca PC wybiera wariant mieszczący się w budżecie  [w toku]
+## US-015 — Osoba składająca PC wybiera wariant mieszczący się w budżecie  [do weryfikacji]
 
 Jako osoba składająca PC chcę przy porównaniu dwóch zestawów bez blokujących konfliktów zobaczyć wskazanie wariantu mieszczącego się w swoim budżecie, żeby nie wybrać konfiguracji przekraczającej mój limit wydatków.
 
