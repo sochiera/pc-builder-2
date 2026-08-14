@@ -79,3 +79,11 @@ Jako osoba składająca PC chcę zobaczyć, które części różnią dwa zapisa
 - Dlaczego teraz: PROJECT.md wymaga porównywania zapisanych konfiguracji jako wariantów, a porównanie kosztów dwóch zestawów zostało już dostarczone do weryfikacji bez pokazania różnic ich części.
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że ekran wskazuje różną część oraz nie oznacza wspólnych wyborów jako różnic.
 - Poza zakresem: porównanie wydajności i zgodności, rekomendowanie wariantu, różnice cen pojedynczych części, nazwy zestawów i porównanie więcej niż dwóch zestawów.
+
+## US-011 — Osoba składająca PC widzi różnice cen części między dwoma zestawami  [nowa]
+
+Jako osoba składająca PC chcę przy każdej różniącej się części zobaczyć ceny obu wariantów, żeby zrozumieć, które wybory odpowiadają za różnicę kosztu zestawów.
+
+- Dlaczego teraz: raport task-032 potwierdził, że porównanie pokazuje już nazwy różnych części, ale nie ich ceny, choć PROJECT.md wymaga, aby ceny wspierały wybór.
+- Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że przy tej części widać ceny obu wyborów oraz ich różnicę w PLN.
+- Poza zakresem: historia i źródła cen, dostawa, rekomendowanie wariantu, porównanie wydajności i zgodności oraz porównanie więcej niż dwóch zestawów.
