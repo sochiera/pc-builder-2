@@ -47,3 +47,11 @@ Jako osoba składająca PC chcę podać swój budżet i zobaczyć, czy koszt wyb
 - Dlaczego teraz: PROJECT.md wskazuje budżet jako kolejny etap wraz z kosztami, a obecna historyjka kosztowa pokazuje kwotę bez odniesienia jej do limitu użytkownika.
 - Sprawdzenie: uruchom demo, ustaw budżet kolejno powyżej i poniżej kosztu aktualnego zestawu i potwierdź, że widoczna ocena rozróżnia oba przypadki oraz pokazuje pozostałą kwotę lub przekroczenie.
 - Poza zakresem: rekomendowanie zamienników, blokowanie wyboru części, wiele budżetów, zapis konfiguracji, import i historia cen oraz oferty sklepów.
+
+## US-007 — Osoba składająca PC zachowuje swój zestaw  [nowa]
+
+Jako osoba składająca PC chcę zapisać aktualny zestaw i później otworzyć go ponownie, żeby nie stracić dokonanych wyborów.
+
+- Dlaczego teraz: PROJECT.md wskazuje zapis konfiguracji jako prawdopodobny etap po kosztach i budżecie, które pokrywają już istniejące historyjki.
+- Sprawdzenie: uruchom demo, wybierz części i budżet, zapisz zestaw, uruchom demo ponownie i potwierdź, że otwarty zestaw zawiera te same wybory oraz budżet.
+- Poza zakresem: konta użytkowników, lista wielu zapisów, edycja nazwy, udostępnianie, porównywanie wariantów i synchronizacja między urządzeniami.
