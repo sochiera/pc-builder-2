@@ -191,16 +191,40 @@ def configuration_budget(configuration, cost):
     return analyze_budget(str(budget), cost)
 
 
+def budget_recommendation(first_id, first_budget, second_id, second_budget,
+                          first_compatibility, second_compatibility):
+    if 'blocking' in (first_compatibility['level'], second_compatibility['level']):
+        return None
+    budgets = (
+        (first_id, first_budget),
+        (second_id, second_budget),
+    )
+    if {budget['level'] for _, budget in budgets} != {'ok', 'blocking'}:
+        return None
+    return next(configuration_id for configuration_id, budget in budgets
+                if budget['level'] == 'ok')
+
+
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
     first_compatibility = configuration_compatibility(first)
     second_compatibility = configuration_compatibility(second)
+    first_budget = configuration_budget(first, first_cost)
+    second_budget = configuration_budget(second, second_cost)
     recommended_configuration_id = None
     if first_compatibility['level'] == 'blocking' and second_compatibility['level'] != 'blocking':
         recommended_configuration_id = second_id
     elif second_compatibility['level'] == 'blocking' and first_compatibility['level'] != 'blocking':
         recommended_configuration_id = first_id
+    budget_recommended_configuration_id = budget_recommendation(
+        first_id,
+        first_budget,
+        second_id,
+        second_budget,
+        first_compatibility,
+        second_compatibility,
+    )
     return {
         'first_configuration_id': first_id,
         'second_configuration_id': second_id,
@@ -214,9 +238,10 @@ def compare_configuration_costs(first_id, first, second_id, second):
         'differences': configuration_differences(first, second),
         'first_compatibility': first_compatibility,
         'second_compatibility': second_compatibility,
-        'first_budget': configuration_budget(first, first_cost),
-        'second_budget': configuration_budget(second, second_cost),
+        'first_budget': first_budget,
+        'second_budget': second_budget,
         'recommended_configuration_id': recommended_configuration_id,
+        'budget_recommended_configuration_id': budget_recommended_configuration_id,
     }
 
 
@@ -290,7 +315,7 @@ def _page_template():
          </main></body></html>'''
     return html.replace(
         "return comparison.first_configuration_id",
-        "return (comparison.recommended_configuration_id === null || comparison.recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant: ' + comparison.recommended_configuration_id + ' | ') + comparison.first_configuration_id",
+        "return (comparison.recommended_configuration_id === null || comparison.recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant: ' + comparison.recommended_configuration_id + ' | ') + (comparison.budget_recommended_configuration_id === null || comparison.budget_recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant budzetowy: ' + comparison.budget_recommended_configuration_id + ' | ') + comparison.first_configuration_id",
     )
 
 

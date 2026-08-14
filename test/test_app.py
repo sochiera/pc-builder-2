@@ -557,9 +557,28 @@ class AppTest(unittest.TestCase):
                     'caseId': 'atx-mid-tower',
                 },
             },
+            'also-within-budget': {
+                'configuration_id': 'also-within-budget',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
             'without-budget': {
                 'configuration_id': 'without-budget',
                 'parts': {'cpuId': 'ryzen-7-7800x3d'},
+            },
+            'blocking-within-budget': {
+                'configuration_id': 'blocking-within-budget',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'asus-z790',
+                },
             },
         }
 
@@ -579,6 +598,11 @@ class AppTest(unittest.TestCase):
                 self.assertEqual(comparison['second_budget']['level'], 'blocking')
                 self.assertEqual(comparison['second_budget']['overage_pln'], 825)
                 self.assertIn('825', comparison['second_budget']['message'])
+                with self.subTest('recommends the only within-budget variant'):
+                    self.assertEqual(
+                        comparison.get('budget_recommended_configuration_id'),
+                        'within-budget',
+                    )
 
                 status, comparison = self.get_json(
                     '/api/compare?firstId=without-budget&secondId=within-budget'
@@ -594,6 +618,33 @@ class AppTest(unittest.TestCase):
                 self.assertEqual(comparison['second_budget']['remaining_pln'], 1025)
                 self.assertEqual(comparison['second_compatibility']['level'], 'ok')
                 self.assertIn('zgodny', comparison['second_compatibility']['message'])
+                with self.subTest('does not recommend without two unambiguous budgets'):
+                    self.assertIsNone(comparison.get('budget_recommended_configuration_id'))
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=over-budget&secondId=within-budget'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('keeps recommendation after swapping variants'):
+                    self.assertEqual(
+                        comparison.get('budget_recommended_configuration_id'),
+                        'within-budget',
+                    )
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=within-budget&secondId=also-within-budget'
+                )
+                self.assertEqual(status, 200)
+                with self.subTest('does not recommend when both fit their budgets'):
+                    self.assertIsNone(comparison.get('budget_recommended_configuration_id'))
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=blocking-within-budget&secondId=within-budget'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(comparison['first_compatibility']['level'], 'blocking')
+                with self.subTest('does not recommend when a variant is blocking'):
+                    self.assertIsNone(comparison.get('budget_recommended_configuration_id'))
 
     def test_compare_configurations_reports_only_different_selected_parts(self):
         configurations = {
@@ -1137,7 +1188,7 @@ class AppTest(unittest.TestCase):
                                 },
                              },
                          }],
-                         ['second-config|first-config', {
+                          ['second-config|first-config', {
                              first_configuration_id: 'second-config',
                              second_configuration_id: 'first-config',
                              recommended_configuration_id: 'first-config',
@@ -1160,9 +1211,61 @@ class AppTest(unittest.TestCase):
                                  level: 'ok',
                                  message: 'Budzet wystarcza; pozostaje 1025 PLN.',
                              },
-                             differences: {},
-                         }],
-                     ]);
+                              differences: {},
+                          }],
+                          ['within-budget|over-budget', {
+                              first_configuration_id: 'within-budget',
+                              second_configuration_id: 'over-budget',
+                              recommended_configuration_id: null,
+                              budget_recommended_configuration_id: 'within-budget',
+                              first_cost_pln: 3250,
+                              second_cost_pln: 3975,
+                              cheaper: 'first',
+                              first_compatibility: {
+                                  level: 'ok',
+                                  message: 'Pierwszy zestaw jest zgodny.',
+                              },
+                              first_budget: {
+                                  level: 'ok',
+                                  message: 'Budzet wystarcza; pozostaje 1750 PLN.',
+                              },
+                              second_compatibility: {
+                                  level: 'ok',
+                                  message: 'Drugi zestaw jest zgodny.',
+                              },
+                              second_budget: {
+                                  level: 'blocking',
+                                  message: 'Budzet przekroczony o 825 PLN.',
+                              },
+                              differences: {},
+                          }],
+                          ['over-budget|within-budget', {
+                              first_configuration_id: 'over-budget',
+                              second_configuration_id: 'within-budget',
+                              recommended_configuration_id: null,
+                              budget_recommended_configuration_id: 'within-budget',
+                              first_cost_pln: 3975,
+                              second_cost_pln: 3250,
+                              cheaper: 'second',
+                              first_compatibility: {
+                                  level: 'ok',
+                                  message: 'Pierwszy zestaw jest zgodny.',
+                              },
+                              first_budget: {
+                                  level: 'blocking',
+                                  message: 'Budzet przekroczony o 825 PLN.',
+                              },
+                              second_compatibility: {
+                                  level: 'ok',
+                                  message: 'Drugi zestaw jest zgodny.',
+                              },
+                              second_budget: {
+                                  level: 'ok',
+                                  message: 'Budzet wystarcza; pozostaje 1750 PLN.',
+                              },
+                              differences: {},
+                          }],
+                      ]);
                     window.fetch = url => {
                         const query = new URL(url, window.location).searchParams;
                         const key = query.get('firstId') + '|' + query.get('secondId');
@@ -1221,10 +1324,24 @@ class AppTest(unittest.TestCase):
                      first.value = 'second-config';
                      second.value = 'first-config';
                      button.click();
-                     const reversedRecommendation = await waitFor(() =>
-                         output.textContent.includes('Rekomendowany wariant: first-config')
-                     );
-                     first.value = 'first-config';
+                      const reversedRecommendation = await waitFor(() =>
+                          output.textContent.includes('Rekomendowany wariant: first-config')
+                      );
+                      first.value = 'within-budget';
+                      second.value = 'over-budget';
+                      button.click();
+                      const budgetRecommendation = await waitFor(() =>
+                          output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
+                      );
+                       first.value = 'over-budget';
+                       second.value = 'within-budget';
+                       button.click();
+                       const reversedBudgetRecommendation = await waitFor(() =>
+                          output.textContent.includes('over-budget: 3975 PLN') &&
+                          output.textContent.includes('within-budget: 3250 PLN') &&
+                          output.textContent.includes('Rekomendowany wariant budzetowy: within-budget')
+                       );
+                      first.value = 'first-config';
                      second.value = 'tie-config';
                      button.click();
                     const refreshedPair = await waitFor(() =>
@@ -1272,8 +1389,10 @@ class AppTest(unittest.TestCase):
                         controls,
                          firstPair,
                          firstRecommendation,
-                         reversedRecommendation,
-                         noRecommendation,
+                          reversedRecommendation,
+                          budgetRecommendation,
+                          reversedBudgetRecommendation,
+                          noRecommendation,
                         firstCompatibility,
                         firstBudget,
                         secondBudget,
@@ -1295,6 +1414,14 @@ class AppTest(unittest.TestCase):
         self.assertTrue(
             state['reversedRecommendation'],
             'porownanie pokazuje rekomendowany identyfikator po odwroceniu wariantow',
+        )
+        self.assertTrue(
+            state['budgetRecommendation'],
+            'porownanie pokazuje rekomendacje wariantu mieszczacego sie w budzecie',
+        )
+        self.assertTrue(
+            state['reversedBudgetRecommendation'],
+            'porownanie pokazuje rekomendacje budzetowa po odwroceniu wariantow',
         )
         self.assertTrue(
             state['noRecommendation'],
