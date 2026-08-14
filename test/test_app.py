@@ -430,6 +430,109 @@ class AppTest(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertIsNone(comparison['recommended_configuration_id'])
 
+    def test_compare_configurations_keeps_partial_compatibility_independent(self):
+        configurations = {
+            'partial-conflict': {
+                'configuration_id': 'partial-conflict',
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'msi-b650',
+                },
+            },
+            'partial-compatible': {
+                'configuration_id': 'partial-compatible',
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                },
+            },
+            'partial-compatible-ram': {
+                'configuration_id': 'partial-compatible-ram',
+                'parts': {
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+            'partial-compatible-case': {
+                'configuration_id': 'partial-compatible-case',
+                'parts': {
+                    'motherboardId': 'msi-b650',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'partial-missing-psu': {
+                'configuration_id': 'partial-missing-psu',
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, first_order = self.get_json(
+                    '/api/compare?firstId=partial-conflict&secondId=partial-compatible'
+                )
+
+                self.assertEqual(status, 200)
+                self.assertEqual(first_order['first_compatibility']['level'], 'blocking')
+                conflict_message = first_order['first_compatibility']['message']
+                self.assertIn('socketu LGA1700', conflict_message)
+                self.assertIn('pamiec RAM', conflict_message)
+                self.assertIn('zasilacz', conflict_message)
+                self.assertEqual(
+                    conflict_message.count(
+                        'Wybierz plyte glowna i pamiec RAM, aby sprawdzic zgodnosc.'
+                    ),
+                    1,
+                )
+                self.assertEqual(conflict_message.count('zasilacz'), 1)
+                self.assertEqual(first_order['second_compatibility']['level'], 'info')
+                self.assertIn('Wybierz', first_order['second_compatibility']['message'])
+
+                for configuration_id, missing_part in (
+                    ('partial-compatible-ram', 'procesor'),
+                    ('partial-compatible-case', 'pamiec RAM'),
+                ):
+                    with self.subTest(configuration_id=configuration_id):
+                        status, partial = self.get_json(
+                            '/api/compare?firstId='
+                            f'{configuration_id}&secondId=partial-compatible'
+                        )
+                        self.assertEqual(status, 200)
+                        self.assertEqual(partial['first_compatibility']['level'], 'info')
+                        self.assertIn(missing_part, partial['first_compatibility']['message'])
+                        self.assertNotIn(
+                            'socketu LGA1700', partial['first_compatibility']['message']
+                        )
+
+                status, missing_psu = self.get_json(
+                    '/api/compare?firstId=partial-missing-psu&secondId=partial-compatible'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(missing_psu['first_compatibility']['level'], 'info')
+                self.assertEqual(
+                    missing_psu['first_compatibility']['message'].count('zasilacz'), 1
+                )
+
+                status, second_order = self.get_json(
+                    '/api/compare?firstId=partial-compatible&secondId=partial-conflict'
+                )
+
+                self.assertEqual(status, 200)
+                self.assertEqual(
+                    second_order['first_compatibility'],
+                    first_order['second_compatibility'],
+                )
+                self.assertEqual(
+                    second_order['second_compatibility'],
+                    first_order['first_compatibility'],
+                )
+
     def test_compare_configurations_reports_each_saved_budget_independently(self):
         configurations = {
             'within-budget': {

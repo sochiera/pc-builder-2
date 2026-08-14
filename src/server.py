@@ -102,12 +102,41 @@ def configuration_part_price(field, product_id):
     return product['price_pln'] if product is not None else 0
 
 
-def analyze_configuration(parts):
+def analyze_configuration(parts, include_missing=False):
     cpu_id = parts.get('cpuId', '')
     motherboard_id = parts.get('motherboardId', '')
     ram_id = parts.get('ramId', '')
     psu_id = parts.get('psuId', '')
     case_id = parts.get('caseId', '')
+
+    if include_missing:
+        analyses = []
+        if cpu_id or motherboard_id:
+            analyses.append(
+                analyze_products(cpu_id, motherboard_id, CPUS, MOTHERBOARDS)
+            )
+        if motherboard_id or ram_id:
+            analyses.append(
+                analyze_memory(motherboard_id, ram_id, MOTHERBOARDS, MEMORY)
+            )
+        if cpu_id or motherboard_id or ram_id or psu_id:
+            analyses.append(
+                analyze_power_supply(
+                    cpu_id,
+                    motherboard_id,
+                    ram_id,
+                    psu_id,
+                    CPUS,
+                    MOTHERBOARDS,
+                    MEMORY,
+                    POWER_SUPPLIES,
+                )
+            )
+        if case_id:
+            analyses.append(analyze_selected_case(motherboard_id, case_id))
+        if not analyses:
+            analyses.append(analyze_build('', ''))
+        return combine_analyses(*analyses)
 
     if 'psuId' in parts or all(
         field in parts for field in ('cpuId', 'motherboardId', 'ramId')
@@ -149,7 +178,7 @@ def analyze_configuration(parts):
 
 
 def configuration_compatibility(configuration):
-    return analyze_configuration(configuration.get('parts', {}))
+    return analyze_configuration(configuration.get('parts', {}), include_missing=True)
 
 
 def configuration_budget(configuration, cost):
