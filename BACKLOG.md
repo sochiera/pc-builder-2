@@ -87,3 +87,11 @@ Jako osoba składająca PC chcę przy każdej różniącej się części zobaczy
 - Dlaczego teraz: raport task-032 potwierdził, że porównanie pokazuje już nazwy różnych części, ale nie ich ceny, choć PROJECT.md wymaga, aby ceny wspierały wybór.
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że przy tej części widać ceny obu wyborów oraz ich różnicę w PLN.
 - Poza zakresem: historia i źródła cen, dostawa, rekomendowanie wariantu, porównanie wydajności i zgodności oraz porównanie więcej niż dwóch zestawów.
+
+## US-012 — Osoba składająca PC porównuje zgodność dwóch zapisanych zestawów  [nowa]
+
+Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zobaczyć zgodność każdego z nich, żeby nie wybrać tańszego wariantu z blokującym problemem.
+
+- Dlaczego teraz: PROJECT.md wymaga porównywania konfiguracji jako wariantów oraz wiarygodnego podsumowania zgodności, a raport task-034 potwierdził domknięcie wyjaśnienia różnic kosztowych bez oceny zgodności wariantów.
+- Sprawdzenie: uruchom demo, zapisz jeden zgodny zestaw i jeden zestaw z blokującym konfliktem, porównaj je i potwierdź, że ekran odrębnie pokazuje zgodność obu wariantów oraz wskazuje problematyczny zestaw.
+- Poza zakresem: rekomendowanie lepszego wariantu, porównanie wydajności, ostrzeżenia nieblokujące, naprawianie konfliktów i porównanie więcej niż dwóch zestawów.

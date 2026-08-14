@@ -28,11 +28,11 @@ Docelowo konfigurator pozwala zbudowac, zapisac, udostepnic i porownac zestawy, 
 
 ## Co stoi
 
-Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Zachowanie, ponowne otwarcie, przekazanie zestawu drugiej osobie, porownanie kosztow i pokazanie roznych czesci dwoch zapisanych zestawow zostaly dostarczone do weryfikacji. Najblizsza nowa praca ma wyjasnic wplyw cenowy kazdej roznej czesci na wynik porownania.
+Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Zachowanie, ponowne otwarcie, przekazanie zestawu drugiej osobie oraz porownanie kosztow, roznych czesci i ich cen zostaly dostarczone do weryfikacji. Najblizsza nowa praca ma pokazac w porownaniu, czy kazdy z dwoch wariantow ma problemy ze zgodnoscia.
 
-Raport ekranowy task-029 potwierdzil, ze porownanie pokazywalo oba koszty i tanszy wariant, ale nie wyjasnialo, ktore wybory czesci tworza te roznice. Dlatego pokazanie roznic czesci bylo najmniejszym kolejnym krokiem domykajacym wymagane porownanie wariantow; raport task-032 potwierdzil dostarczenie nazw tych czesci, lecz nadal bez ich roznic cenowych.
+Raport ekranowy task-029 potwierdzil, ze porownanie pokazywalo oba koszty i tanszy wariant, ale nie wyjasnialo, ktore wybory czesci tworza te roznice. Raport task-032 potwierdzil dostarczenie nazw tych czesci, a task-034 potwierdzil widoczne ceny obu wyborow i ich roznice. Porownanie wyjasnia zatem koszt, ale nie pokazuje jeszcze zgodnosci wariantow wymaganej w docelowym, wiarygodnym podsumowaniu zestawu.
 
-Backlog wyjatkowo ma jedenascie aktywnych historyjek, poniewaz dziesiec dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Utrzymujemy jeden cienki przyrost gotowy do pracy i nie poszerzamy kolejki ponownie do czasu zwolnienia miejsca przez weryfikacje.
+Backlog wyjatkowo ma dwanascie aktywnych historyjek, poniewaz jedenascie dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Utrzymujemy jeden cienki przyrost gotowy do pracy i nie poszerzamy kolejki ponownie do czasu zwolnienia miejsca przez weryfikacje.
 
 ## Kolejne prawdopodobne etapy
 
