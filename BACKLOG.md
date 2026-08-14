@@ -55,3 +55,11 @@ Jako osoba składająca PC chcę zapisać aktualny zestaw i później otworzyć 
 - Dlaczego teraz: PROJECT.md wskazuje zapis konfiguracji jako prawdopodobny etap po kosztach i budżecie, które pokrywają już istniejące historyjki.
 - Sprawdzenie: uruchom demo, wybierz części i budżet, zapisz zestaw, uruchom demo ponownie i potwierdź, że otwarty zestaw zawiera te same wybory oraz budżet.
 - Poza zakresem: konta użytkowników, lista wielu zapisów, edycja nazwy, udostępnianie, porównywanie wariantów i synchronizacja między urządzeniami.
+
+## US-008 — Osoba składająca PC udostępnia zapisany zestaw  [nowa]
+
+Jako osoba składająca PC chcę przekazać zapisany zestaw drugiej osobie, żeby mogła zobaczyć te same części, budżet i oceny.
+
+- Dlaczego teraz: PROJECT.md stawia udostępnianie zestawów po ich zapisywaniu w celu docelowym, a zapis i ponowne otwarcie zestawu zostały już dostarczone do weryfikacji.
+- Sprawdzenie: uruchom demo, zapisz zestaw, przekaż uzyskany odnośnik drugiej osobie i potwierdź w osobnej sesji, że otwiera on te same części, budżet i widoczne oceny.
+- Poza zakresem: konta użytkowników, uprawnienia dostępu, wspólna edycja, wygasanie odnośników, media społecznościowe i porównywanie wariantów.

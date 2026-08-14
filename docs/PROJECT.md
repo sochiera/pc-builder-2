@@ -28,9 +28,9 @@ Docelowo konfigurator pozwala zbudowac, zapisac, udostepnic i porownac zestawy, 
 
 ## Co stoi
 
-Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Te przyrosty czekaja na weryfikacje, a najblizsza nowa praca dotyczy zachowania i ponownego otwarcia jednego zestawu.
+Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Zachowanie i ponowne otwarcie jednego zestawu zostalo dostarczone do weryfikacji, a najblizsza nowa praca dotyczy przekazania zestawu drugiej osobie.
 
-Backlog wyjatkowo ma siedem aktywnych historyjek, poniewaz szesc dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Nie poszerzamy kolejki o kolejny przyrost do czasu zwolnienia miejsca przez weryfikacje.
+Backlog wyjatkowo ma osiem aktywnych historyjek, poniewaz siedem dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Utrzymujemy jeden cienki przyrost gotowy do pracy i nie poszerzamy kolejki ponownie do czasu zwolnienia miejsca przez weryfikacje.
 
 ## Kolejne prawdopodobne etapy
 
@@ -40,4 +40,4 @@ Backlog wyjatkowo ma siedem aktywnych historyjek, poniewaz szesc dostarczonych p
 
 ## Swiadomie odlozone
 
-Pozostale kategorie, importy sklepowe, ceny, konta, udostepnianie, warianty i pelna analiza zestawu. Ich brak w szkielecie jest zamierzony, nie stanowi dlugu.
+Pozostale kategorie, importy sklepowe, historia cen, konta, warianty i pelna analiza zestawu. Ich brak w szkielecie jest zamierzony, nie stanowi dlugu.
