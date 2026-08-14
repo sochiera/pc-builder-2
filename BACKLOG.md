@@ -63,3 +63,11 @@ Jako osoba składająca PC chcę przekazać zapisany zestaw drugiej osobie, żeb
 - Dlaczego teraz: PROJECT.md stawia udostępnianie zestawów po ich zapisywaniu w celu docelowym, a zapis i ponowne otwarcie zestawu zostały już dostarczone do weryfikacji.
 - Sprawdzenie: uruchom demo, zapisz zestaw, przekaż uzyskany odnośnik drugiej osobie i potwierdź w osobnej sesji, że otwiera on te same części, budżet i widoczne oceny.
 - Poza zakresem: konta użytkowników, uprawnienia dostępu, wspólna edycja, wygasanie odnośników, media społecznościowe i porównywanie wariantów.
+
+## US-009 — Osoba składająca PC porównuje koszt dwóch zapisanych zestawów  [nowa]
+
+Jako osoba składająca PC chcę zestawić koszty dwóch zapisanych konfiguracji, żeby łatwo wybrać tańszy wariant.
+
+- Dlaczego teraz: PROJECT.md wymaga porównywania zapisanych konfiguracji jako wariantów, a zapis i udostępnianie zestawów zostały już dostarczone do weryfikacji.
+- Sprawdzenie: uruchom demo, zapisz dwa zestawy o różnych kosztach, porównaj je i potwierdź, że widzisz oba koszty oraz wskazanie tańszego zestawu.
+- Poza zakresem: porównanie wydajności i zgodności, różnice między pojedynczymi częściami, rekomendowanie wariantu, nazwy zestawów i porównanie więcej niż dwóch zestawów.
