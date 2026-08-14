@@ -9,7 +9,7 @@ import time
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from src import catalog
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
@@ -134,6 +134,71 @@ class AppTest(unittest.TestCase):
                 return response.status, json.loads(response.read())
         except HTTPError as error:
             return error.code, {}
+
+    def post_json(self, path, payload):
+        request = Request(
+            f'{self.base_url}{path}',
+            data=json.dumps(payload).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+        try:
+            with urlopen(request) as response:
+                return response.status, json.loads(response.read())
+        except HTTPError as error:
+            try:
+                body = json.loads(error.read())
+            except json.JSONDecodeError:
+                body = {}
+            finally:
+                error.close()
+            return error.code, body
+
+    def test_configuration_save_returns_id_and_preserves_selected_parts_and_budget(self):
+        payload = {
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+
+        status, saved = self.post_json('/api/configurations', payload)
+
+        self.assertEqual(status, 201)
+        self.assertTrue(saved.get('configuration_id'))
+        self.assertEqual(saved.get('parts'), {
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+        })
+        self.assertEqual(saved.get('budgetPln'), 5000)
+
+        status, saved = self.post_json('/api/configurations', {
+            'cpuId': 'core-i5-14600k',
+        })
+
+        self.assertEqual(status, 201)
+        self.assertTrue(saved.get('configuration_id'))
+        self.assertEqual(saved.get('parts'), {'cpuId': 'core-i5-14600k'})
+        self.assertNotIn('budgetPln', saved)
+
+    def test_configuration_save_rejects_invalid_parts_and_budget_without_creating_one(self):
+        invalid_payloads = (
+            ({'cpuId': 'msi-b650'}, 'cpuId'),
+            ({'budgetPln': -1}, 'Budzet'),
+        )
+
+        for payload, expected_error in invalid_payloads:
+            with self.subTest(payload=payload):
+                status, response = self.post_json('/api/configurations', payload)
+
+                self.assertEqual(status, 400)
+                self.assertIn(expected_error, response.get('error', ''))
+                self.assertFalse(self.app.configurations)
 
     def test_catalog_exposes_named_products_with_stable_identifiers(self):
         with urlopen(self.base_url) as response:

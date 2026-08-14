@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
 import json
 import os
+from uuid import uuid4
 from urllib.parse import parse_qs, urlparse
 
 from src.analyze_build import analyze_build
@@ -16,6 +17,15 @@ from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import INITIAL_ANALYSIS_REQUIRED_MESSAGE
 from src.catalog import CASES, CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
+
+
+CONFIGURATION_CATALOGS = {
+    'cpuId': CPUS,
+    'motherboardId': MOTHERBOARDS,
+    'ramId': MEMORY,
+    'psuId': POWER_SUPPLIES,
+    'caseId': CASES,
+}
 
 
 def render_options(products):
@@ -60,6 +70,57 @@ def analyze_selected_case(motherboard_id, case_id):
 
 
 class AppHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        request = urlparse(self.path)
+        if request.path != '/api/configurations':
+            self.respond(404, 'text/plain; charset=utf-8', 'Not found')
+            return
+
+        try:
+            length = int(self.headers.get('Content-Length', ''))
+            payload = json.loads(self.rfile.read(length))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                'error': 'Podaj dane zestawu w formacie JSON.',
+            }))
+            return
+
+        if not isinstance(payload, dict):
+            self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                'error': 'Dane zestawu musza byc obiektem JSON.',
+            }))
+            return
+
+        parts = {}
+        for field, products in CONFIGURATION_CATALOGS.items():
+            if field not in payload:
+                continue
+            product_id = payload[field]
+            if not isinstance(product_id, str) or not product_id or not any(
+                product['id'] == product_id for product in products
+            ):
+                self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                    'error': f'Niepoprawny identyfikator {field}.',
+                }))
+                return
+            parts[field] = product_id
+
+        budget = payload.get('budgetPln')
+        if 'budgetPln' in payload and (
+            isinstance(budget, bool) or not isinstance(budget, int) or budget < 0
+        ):
+            self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                'error': 'Budzet musi byc nieujemna liczba calkowita w PLN.',
+            }))
+            return
+
+        configuration_id = uuid4().hex
+        saved = {'configuration_id': configuration_id, 'parts': parts}
+        if 'budgetPln' in payload:
+            saved['budgetPln'] = budget
+        self.server.configurations[configuration_id] = saved
+        self.respond(201, 'application/json; charset=utf-8', json.dumps(saved))
+
     def do_GET(self):
         request = urlparse(self.path)
         if request.path == '/api/analyze':
@@ -172,7 +233,9 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def create_app(host='127.0.0.1', port=3000):
-    return ThreadingHTTPServer((host, port), AppHandler)
+    app = ThreadingHTTPServer((host, port), AppHandler)
+    app.configurations = {}
+    return app
 
 
 if __name__ == '__main__':
