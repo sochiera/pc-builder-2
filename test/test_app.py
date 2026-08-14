@@ -364,6 +364,26 @@ class AppTest(unittest.TestCase):
         self.assertEqual(len(set(ratings)), len(ratings))
         self.assertTrue(all(rating > 0 for rating in ratings))
 
+    def test_catalog_binds_positive_pln_prices_to_every_selectable_product_id(self):
+        products = CPUS + MOTHERBOARDS + MEMORY + POWER_SUPPLIES + catalog.CASES
+        product_ids = [product.get('id') for product in products]
+
+        self.assertEqual(len(product_ids), len(set(product_ids)))
+
+        prices_by_id = {}
+        for product in products:
+            with self.subTest(product_id=product.get('id')):
+                self.assertTrue(product.get('id'))
+                self.assertIn('price_pln', product)
+                self.assertIsInstance(product['price_pln'], (int, float))
+                self.assertGreater(product['price_pln'], 0)
+                prices_by_id[product['id']] = product['price_pln']
+
+        self.assertEqual(
+            set(prices_by_id),
+            {product['id'] for product in products},
+        )
+
     def test_memory_catalog_binds_products_to_public_standards(self):
         standards_by_id = {product['id']: product['standard'] for product in MEMORY}
 
