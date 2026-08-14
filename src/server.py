@@ -10,6 +10,7 @@ from src.analyze_build import analyze_memory
 from src.analyze_build import analyze_case
 from src.analyze_build import analyze_products
 from src.analyze_build import analyze_power_supply
+from src.analyze_build import total_cost
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
 from src.catalog import CASES, CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
@@ -144,6 +145,10 @@ class AppHandler(BaseHTTPRequestHandler):
                     value('cpuSocket'),
                     value('motherboardSocket'),
                 )
+            result['total_cost_pln'] = total_cost(
+                (value('cpuId'), value('motherboardId'), value('ramId'), value('psuId'), value('caseId')),
+                (CPUS, MOTHERBOARDS, MEMORY, POWER_SUPPLIES, CASES),
+            )
             self.respond(200, 'application/json; charset=utf-8', json.dumps(result))
             return
         if request.path == '/':

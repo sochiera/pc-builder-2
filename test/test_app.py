@@ -384,6 +384,45 @@ class AppTest(unittest.TestCase):
             {product['id'] for product in products},
         )
 
+    def test_analysis_reports_cost_for_known_parts_and_excludes_unknown_parts(self):
+        base_query = 'cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+
+        with self.subTest('known selected parts have their exact total cost'):
+            status, analysis = self.get_json(
+                f'/api/analyze?{base_query}&ramId=corsair-vengeance-ddr5'
+                '&psuId=corsair-rm750x&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertIn('total_cost_pln', analysis)
+            self.assertEqual(analysis['total_cost_pln'], 3975)
+
+        with self.subTest('adding and removing a part changes the total by its price'):
+            status, without_case = self.get_json(f'/api/analyze?{base_query}')
+            self.assertEqual(status, 200)
+            self.assertIn('total_cost_pln', without_case)
+            self.assertEqual(without_case['total_cost_pln'], 2498)
+
+            status, with_case = self.get_json(
+                f'/api/analyze?{base_query}&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertIn('total_cost_pln', with_case)
+            self.assertEqual(with_case['total_cost_pln'] - without_case['total_cost_pln'], 349)
+
+        with self.subTest('unknown identifiers are not included as zero-priced parts'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=unknown-cpu&motherboardId=msi-b650'
+            )
+            self.assertEqual(status, 200)
+            self.assertIn('total_cost_pln', analysis)
+            self.assertEqual(analysis['total_cost_pln'], 899)
+
+        with self.subTest('no selected parts have zero total cost'):
+            status, analysis = self.get_json('/api/analyze')
+            self.assertEqual(status, 200)
+            self.assertIn('total_cost_pln', analysis)
+            self.assertEqual(analysis['total_cost_pln'], 0)
+
     def test_memory_catalog_binds_products_to_public_standards(self):
         standards_by_id = {product['id']: product['standard'] for product in MEMORY}
 
@@ -448,14 +487,24 @@ class AppTest(unittest.TestCase):
             self.assertIn('Pamiec RAM DDR5 jest zgodna z plyta glowna.', sufficient['message'])
 
         with self.subTest('exactly sufficient power supply'):
-            exact_supply = ({'id': 'exact-psu', 'name': 'Graniczny zasilacz', 'power_watts': 210},)
+            exact_supply = ({
+                'id': 'exact-psu',
+                'name': 'Graniczny zasilacz',
+                'power_watts': 210,
+                'price_pln': 1,
+            },)
             with patch('src.server.POWER_SUPPLIES', exact_supply):
                 status, exact = self.get_json(f'/api/analyze?{base_query}&psuId=exact-psu')
             self.assertEqual(status, 200)
             self.assertEqual(exact['level'], 'ok')
 
         with self.subTest('insufficient power supply'):
-            weak_supply = ({'id': 'weak-psu', 'name': 'Slaby zasilacz', 'power_watts': 100},)
+            weak_supply = ({
+                'id': 'weak-psu',
+                'name': 'Slaby zasilacz',
+                'power_watts': 100,
+                'price_pln': 1,
+            },)
             with patch('src.server.POWER_SUPPLIES', weak_supply):
                 status, insufficient = self.get_json(f'/api/analyze?{base_query}&psuId=weak-psu')
             self.assertEqual(status, 200)
@@ -717,7 +766,12 @@ class AppTest(unittest.TestCase):
         self.assertIn('Pamiec RAM DDR5 jest zgodna', analysis['text'])
 
     def test_page_shows_power_status_before_and_after_power_supply_change(self):
-        weak_supply = {'id': 'test-weak-psu', 'name': 'Testowy zasilacz 100 W', 'power_watts': 100}
+        weak_supply = {
+            'id': 'test-weak-psu',
+            'name': 'Testowy zasilacz 100 W',
+            'power_watts': 100,
+            'price_pln': 1,
+        }
         with patch('src.server.POWER_SUPPLIES', POWER_SUPPLIES + (weak_supply,)):
             with Browser(self.base_url) as browser:
                 statuses = browser.evaluate("""
@@ -874,7 +928,9 @@ class AppTest(unittest.TestCase):
         with urlopen(f'{self.base_url}/api/analyze?cpuSocket=AM5&motherboardSocket=LGA1700') as response:
             analysis = json.loads(response.read())
 
-        self.assertEqual(analysis, {
-            'level': 'blocking',
-            'message': 'Procesor wymaga socketu AM5, a plyta ma LGA1700.',
-        })
+        self.assertEqual(analysis['level'], 'blocking')
+        self.assertEqual(
+            analysis['message'],
+            'Procesor wymaga socketu AM5, a plyta ma LGA1700.',
+        )
+        self.assertEqual(analysis['total_cost_pln'], 0)

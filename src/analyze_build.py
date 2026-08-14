@@ -19,6 +19,15 @@ def combine_analyses(*analyses):
     }
 
 
+def total_cost(part_ids, catalogs):
+    return sum(
+        product['price_pln']
+        for product_id, catalog in zip(part_ids, catalogs)
+        for product in (find_product(catalog, product_id),)
+        if product is not None
+    )
+
+
 def analyze_build(cpu_socket, motherboard_socket):
     if not cpu_socket or not motherboard_socket:
         return {
