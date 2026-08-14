@@ -1,6 +1,7 @@
 import json
 import base64
 from html.parser import HTMLParser
+from http.client import RemoteDisconnected
 import os
 from pathlib import Path
 import socket
@@ -243,6 +244,7 @@ class AppTest(unittest.TestCase):
         invalid_payloads = (
             ({'cpuId': 'msi-b650'}, 'cpuId'),
             ({'budgetPln': -1}, 'Budzet'),
+            ({'budgetPln': '9' * 5000}, 'Budzet'),
         )
 
         with TemporaryDirectory() as directory:
@@ -252,7 +254,10 @@ class AppTest(unittest.TestCase):
                 for payload, expected_error in invalid_payloads:
                     with self.subTest(payload=payload):
                         before = store.read_bytes()
-                        status, response = self.post_json('/api/configurations', payload)
+                        try:
+                            status, response = self.post_json('/api/configurations', payload)
+                        except RemoteDisconnected:
+                            status, response = None, {}
 
                         self.assertEqual(status, 400)
                         self.assertIn(expected_error, response.get('error', ''))
@@ -362,6 +367,188 @@ class AppTest(unittest.TestCase):
             {name for _, name in case_options},
             {case.get('name') for case in cases},
         )
+
+    def test_page_saves_current_configuration_and_shows_identifier(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                with Browser(self.base_url) as browser:
+                    status = browser.evaluate("""
+                        (async () => {
+                            const save = document.querySelector('#save-configuration');
+                            const identifier = document.querySelector('#configuration-id');
+                            if (!save || !identifier) return false;
+                            document.querySelector('#cpu').value = 'ryzen-7-7800x3d';
+                            document.querySelector('#motherboard').value = 'msi-b650';
+                            document.querySelector('#memory').value = 'corsair-vengeance-ddr5';
+                            document.querySelector('#power-supply').value = 'corsair-rm750x';
+                            document.querySelector('#case').value = 'atx-mid-tower';
+                            document.querySelector('#budget').value = '5000';
+                            save.click();
+                            for (let attempt = 0; attempt < 200 && !identifier.textContent; attempt++) {
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }
+                            const response = await fetch('/api/configurations/' + identifier.textContent);
+                            return {
+                                id: identifier.textContent,
+                                status: response.status,
+                                saved: await response.json(),
+                            };
+                        })()
+                    """)
+
+        self.assertIsInstance(status, dict)
+        self.assertTrue(status['id'])
+        self.assertEqual(status['status'], 200)
+        self.assertEqual(status['saved']['parts'], {
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+        })
+        self.assertEqual(status['saved']['budgetPln'], 5000)
+
+    def test_page_opens_saved_configuration_and_refreshes_visible_analysis(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const open = document.querySelector('#open-configuration');
+                    const identifier = document.querySelector('#configuration-id-input');
+                    if (!open || !identifier) return false;
+                    window.fetch = url => {
+                        if (url === '/api/configurations/saved-config-123') {
+                            return Promise.resolve({json: () => Promise.resolve({
+                                parts: {
+                                    cpuId: 'ryzen-7-7800x3d',
+                                    motherboardId: 'msi-b650',
+                                    ramId: 'corsair-vengeance-ddr5',
+                                    psuId: 'corsair-rm750x',
+                                    caseId: 'atx-mid-tower',
+                                },
+                                budgetPln: 5000,
+                            })});
+                        }
+                        return Promise.resolve({json: () => Promise.resolve({
+                            level: 'ok', message: 'Zestaw zgodny.',
+                            total_cost_pln: 4500,
+                            budget: {level: 'ok', message: 'Pozostalo 500 PLN.'},
+                        })});
+                    };
+                    identifier.value = 'saved-config-123';
+                    open.click();
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    return {
+                        cpu: document.querySelector('#cpu').value,
+                        motherboard: document.querySelector('#motherboard').value,
+                        memory: document.querySelector('#memory').value,
+                        powerSupply: document.querySelector('#power-supply').value,
+                        caseId: document.querySelector('#case').value,
+                        budget: document.querySelector('#budget').value,
+                        cost: document.querySelector('#total-cost').textContent,
+                        result: document.querySelector('#result').textContent,
+                        budgetResult: document.querySelector('#budget-result').textContent,
+                    };
+                })()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state['cpu'], 'ryzen-7-7800x3d')
+        self.assertEqual(state['motherboard'], 'msi-b650')
+        self.assertEqual(state['memory'], 'corsair-vengeance-ddr5')
+        self.assertEqual(state['powerSupply'], 'corsair-rm750x')
+        self.assertEqual(state['caseId'], 'atx-mid-tower')
+        self.assertEqual(state['budget'], '5000')
+        self.assertEqual(state['cost'], '4500 PLN')
+        self.assertEqual(state['result'], 'Zestaw zgodny.')
+        self.assertEqual(state['budgetResult'], 'Pozostalo 500 PLN.')
+
+    def test_page_opens_saved_configuration_after_app_restart(self):
+        payload = {
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, saved = self.post_json('/api/configurations', payload)
+                self.assertEqual(status, 201)
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with Browser(restarted_url) as browser:
+                        state = browser.evaluate(f"""
+                            (async () => {{
+                                const identifier = document.querySelector('#configuration-id-input');
+                                const open = document.querySelector('#open-configuration');
+                                identifier.value = '{saved['configuration_id']}';
+                                open.click();
+                                for (let attempt = 0; attempt < 200 && (document.querySelector('#cpu').value !== 'ryzen-7-7800x3d' || document.querySelector('#total-cost').textContent === '0 PLN'); attempt++) {{
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }}
+                                return {{
+                                    cpu: document.querySelector('#cpu').value,
+                                    motherboard: document.querySelector('#motherboard').value,
+                                    memory: document.querySelector('#memory').value,
+                                    powerSupply: document.querySelector('#power-supply').value,
+                                    caseId: document.querySelector('#case').value,
+                                    budget: document.querySelector('#budget').value,
+                                    cost: document.querySelector('#total-cost').textContent,
+                                    result: document.querySelector('#result').textContent,
+                                    budgetResult: document.querySelector('#budget-result').textContent,
+                                }};
+                            }})()
+                        """)
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+        self.assertEqual(state['cpu'], payload['cpuId'])
+        self.assertEqual(state['motherboard'], payload['motherboardId'])
+        self.assertEqual(state['memory'], payload['ramId'])
+        self.assertEqual(state['powerSupply'], payload['psuId'])
+        self.assertEqual(state['caseId'], payload['caseId'])
+        self.assertEqual(state['budget'], str(payload['budgetPln']))
+        self.assertIn('PLN', state['cost'])
+        self.assertTrue(state['result'])
+        self.assertTrue(state['budgetResult'])
+
+    def test_page_reports_missing_configuration_without_replacing_current_choices(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const open = document.querySelector('#open-configuration');
+                    document.querySelector('#cpu').value = 'ryzen-7-7800x3d';
+                    document.querySelector('#budget').value = '5000';
+                    window.fetch = () => Promise.resolve({
+                        ok: false,
+                        json: () => Promise.resolve({error: 'Nie znaleziono konfiguracji.'}),
+                    });
+                    document.querySelector('#configuration-id-input').value = 'does-not-exist';
+                    open.click();
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    return {
+                        cpu: document.querySelector('#cpu').value,
+                        budget: document.querySelector('#budget').value,
+                        error: document.querySelector('#result').textContent,
+                    };
+                })()
+            """)
+
+        self.assertEqual(state['cpu'], 'ryzen-7-7800x3d')
+        self.assertEqual(state['budget'], '5000')
+        self.assertIn('Nie znaleziono konfiguracji.', state['error'])
 
     def test_page_sends_selected_case_identifier_when_case_changes(self):
         with Browser(self.base_url) as browser:

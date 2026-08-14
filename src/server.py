@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
 import json
 import os
+import re
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -54,6 +55,15 @@ def save_configuration(configuration_id, configuration):
         temporary_store.replace(CONFIGURATION_STORE)
 
 
+def normalize_budget(value):
+    if isinstance(value, str) and value.isascii() and value.isdecimal():
+        try:
+            return int(value)
+        except ValueError:
+            return value
+    return value
+
+
 def render_options(products):
     return ''.join(
         f"<option value=\"{escape(product['id'], quote=True)}\">"
@@ -62,7 +72,7 @@ def render_options(products):
     )
 
 
-def page():
+def _page_template():
     cpu_options = render_options(CPUS)
     motherboard_options = render_options(MOTHERBOARDS)
     memory_options = render_options(MEMORY)
@@ -82,8 +92,35 @@ def page():
      <p>Koszt zestawu: <output id=total-cost>0 PLN</output></p>
      <label for=budget>Budzet (PLN)</label><input id=budget type=text inputmode=numeric placeholder="Nie ustawiono">
      <output id=budget-result>Podaj budzet jako nieujemna calkowita kwote w PLN.</output>
-     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),budget=document.querySelector('#budget'),result=document.querySelector('#result'),budgetResult=document.querySelector('#budget-result'),totalCost=document.querySelector('#total-cost'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);if(caseSelect.value)params.set('caseId',caseSelect.value);if(budget.value)params.set('budgetPln',budget.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;budgetResult.textContent=analysis.budget.message;budgetResult.dataset.level=analysis.budget.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}selects.forEach(select=>select.addEventListener('change',refresh));budget.addEventListener('change',refresh)</script>
-    </main></body></html>'''
+     <p><button id=save-configuration type=button>Zapisz konfiguracje</button> <output id=configuration-id></output></p>
+     <label for=configuration-id-input>Identyfikator zapisanej konfiguracji</label><input id=configuration-id-input type=text>
+     <button id=open-configuration type=button>Otworz konfiguracje</button>
+     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),budget=document.querySelector('#budget'),result=document.querySelector('#result'),budgetResult=document.querySelector('#budget-result'),totalCost=document.querySelector('#total-cost'),saveConfiguration=document.querySelector('#save-configuration'),configurationId=document.querySelector('#configuration-id'),configurationIdInput=document.querySelector('#configuration-id-input'),openConfiguration=document.querySelector('#open-configuration'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;function selectedConfiguration(){const configuration={};[['cpuId',cpu],['motherboardId',motherboard],['ramId',memory],['psuId',powerSupply],['caseId',caseSelect]].forEach(([name,select])=>{if(select.value)configuration[name]=select.value});if(budget.value)configuration.budgetPln=budget.value;return configuration}function applyConfiguration(configuration){const parts=configuration.parts||{};cpu.value=parts.cpuId||'';motherboard.value=parts.motherboardId||'';memory.value=parts.ramId||'';powerSupply.value=parts.psuId||'';caseSelect.value=parts.caseId||'';budget.value=configuration.budgetPln===undefined?'':configuration.budgetPln}async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams(selectedConfiguration());const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;budgetResult.textContent=analysis.budget.message;budgetResult.dataset.level=analysis.budget.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}saveConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(selectedConfiguration())});const saved=await response.json();configurationId.textContent=saved.configuration_id});openConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdInput.value));const saved=await response.json();applyConfiguration(saved);await refresh()});selects.forEach(select=>select.addEventListener('change',refresh));budget.addEventListener('change',refresh)</script>
+      <script>document.addEventListener('click',async event=>{if(event.target!==openConfiguration)return;event.stopImmediatePropagation();const configurationIdValue=configurationIdInput.value.trim();if(!configurationIdValue){result.textContent='Podaj identyfikator konfiguracji.';result.dataset.level='blocking';return}const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdValue));const configuration=await response.json();if(response.ok===false){result.textContent=configuration.error||'Nie udalo sie otworzyc konfiguracji.';result.dataset.level='blocking';return}applyConfiguration(configuration);refresh()},{capture:true})</script>
+     </main></body></html>'''
+
+
+def page():
+    html = _page_template()
+    html = re.sub(
+        r"<script>document\.addEventListener\('click'.*?</script>",
+        '',
+        html,
+        flags=re.DOTALL,
+    )
+    html = re.sub(
+        r"saveConfiguration\.addEventListener\('click',async\(\)=>\{.*?\}\);openConfiguration\.addEventListener",
+        "saveConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(selectedConfiguration())});const saved=await response.json();if(response.ok===false){result.textContent=saved.error||'Nie udalo sie zapisac konfiguracji.';result.dataset.level='blocking';return}configurationId.textContent=saved.configuration_id});openConfiguration.addEventListener",
+        html,
+        flags=re.DOTALL,
+    )
+    html = re.sub(
+        r"openConfiguration\.addEventListener\('click',async\(\)=>\{.*?\}\);selects\.forEach",
+        "openConfiguration.addEventListener('click',async()=>{const configurationIdValue=configurationIdInput.value.trim();if(!configurationIdValue){result.textContent='Podaj identyfikator konfiguracji.';result.dataset.level='blocking';return}const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdValue));const saved=await response.json();if(response.ok===false){result.textContent=saved.error||'Nie udalo sie otworzyc konfiguracji.';result.dataset.level='blocking';return}applyConfiguration(saved);await refresh()});selects.forEach",
+        html,
+        flags=re.DOTALL,
+    )
+    return html
 
 
 def analyze_selected_case(motherboard_id, case_id):
@@ -131,7 +168,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             parts[field] = product_id
 
-        budget = payload.get('budgetPln')
+        budget = normalize_budget(payload.get('budgetPln'))
         if 'budgetPln' in payload and (
             isinstance(budget, bool) or not isinstance(budget, int) or budget < 0
         ):
