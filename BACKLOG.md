@@ -1,5 +1,13 @@
 # Backlog
 
+## US-019 — Osoba składająca PC wybiera nazwane zestawy do porównania  [nowa]
+
+Jako osoba składająca PC chcę wskazać dwa nazwane zestawy z listy zapisanych wariantów, żeby porównać je bez pamiętania ich technicznych identyfikatorów.
+
+- Dlaczego teraz: PROJECT.md wymaga porównywalnych wariantów, a raport task-050 potwierdził widoczną listę nazwanych zapisów, podczas gdy wybór zestawów do porównania pozostał poza zakresem US-018.
+- Sprawdzenie: uruchom demo z co najmniej dwoma nazwanymi zapisami, wybierz z widocznych list dwa różne zestawy i potwierdź, że ekran pokazuje porównanie właśnie tych wariantów.
+- Poza zakresem: porównanie więcej niż dwóch zestawów, tworzenie, usuwanie, zmiana nazw, wyszukiwanie i sortowanie zapisów oraz zmiana zakresu danych pokazywanych w porównaniu.
+
 ## US-018 — Osoba składająca PC otwiera zestaw z listy zapisanych wariantów  [do weryfikacji]
 
 Jako osoba składająca PC chcę wybrać zapisany zestaw z listy rozpoznawalnych wariantów, żeby wrócić do niego bez pamiętania technicznego identyfikatora.
