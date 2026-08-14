@@ -152,6 +152,16 @@ def configuration_compatibility(configuration):
     return analyze_configuration(configuration.get('parts', {}))
 
 
+def configuration_budget(configuration, cost):
+    budget = configuration.get('budgetPln')
+    if budget is None:
+        return {
+            'level': 'info',
+            'message': 'Budzet nie ustawiony; brak limitu do porownania.',
+        }
+    return analyze_budget(str(budget), cost)
+
+
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
@@ -168,6 +178,8 @@ def compare_configuration_costs(first_id, first, second_id, second):
         'differences': configuration_differences(first, second),
         'first_compatibility': configuration_compatibility(first),
         'second_compatibility': configuration_compatibility(second),
+        'first_budget': configuration_budget(first, first_cost),
+        'second_budget': configuration_budget(second, second_cost),
     }
 
 

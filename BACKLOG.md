@@ -96,7 +96,7 @@ Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zo
 - Sprawdzenie: uruchom demo, zapisz jeden zgodny zestaw i jeden zestaw z blokującym konfliktem, porównaj je i potwierdź, że ekran odrębnie pokazuje zgodność obu wariantów oraz wskazuje problematyczny zestaw.
 - Poza zakresem: rekomendowanie lepszego wariantu, porównanie wydajności, ostrzeżenia nieblokujące, naprawianie konfliktów i porównanie więcej niż dwóch zestawów.
 
-## US-013 — Osoba składająca PC porównuje zestawy względem ich budżetów  [nowa]
+## US-013 — Osoba składająca PC porównuje zestawy względem ich budżetów  [w toku]
 
 Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zobaczyć, czy każdy z nich mieści się we własnym budżecie, żeby koszt tańszego wariantu nie przesłonił mojego limitu wydatków.
 

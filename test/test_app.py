@@ -384,6 +384,68 @@ class AppTest(unittest.TestCase):
         self.assertEqual(comparison['second_compatibility']['level'], 'blocking')
         self.assertIn('socket', comparison['second_compatibility']['message'])
 
+    def test_compare_configurations_reports_each_saved_budget_independently(self):
+        configurations = {
+            'within-budget': {
+                'configuration_id': 'within-budget',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'over-budget': {
+                'configuration_id': 'over-budget',
+                'budgetPln': 3000,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'without-budget': {
+                'configuration_id': 'without-budget',
+                'parts': {'cpuId': 'ryzen-7-7800x3d'},
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=within-budget&secondId=over-budget'
+                )
+                self.assertEqual(status, 200)
+                self.assertIn('first_budget', comparison)
+                self.assertIn('second_budget', comparison)
+                self.assertEqual(comparison['first_budget']['level'], 'ok')
+                self.assertEqual(comparison['first_budget']['remaining_pln'], 1025)
+                self.assertIn('1025', comparison['first_budget']['message'])
+                self.assertEqual(comparison['second_budget']['level'], 'blocking')
+                self.assertEqual(comparison['second_budget']['overage_pln'], 825)
+                self.assertIn('825', comparison['second_budget']['message'])
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=without-budget&secondId=within-budget'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(comparison['first_cost_pln'], 1599)
+                self.assertEqual(comparison['second_cost_pln'], 3975)
+                self.assertIn('first_budget', comparison)
+                self.assertIn('second_budget', comparison)
+                self.assertEqual(comparison['first_budget']['level'], 'info')
+                self.assertIn('nie ustaw', comparison['first_budget']['message'])
+                self.assertEqual(comparison['second_budget']['level'], 'ok')
+                self.assertEqual(comparison['second_budget']['remaining_pln'], 1025)
+                self.assertEqual(comparison['second_compatibility']['level'], 'ok')
+                self.assertIn('zgodny', comparison['second_compatibility']['message'])
+
     def test_compare_configurations_reports_only_different_selected_parts(self):
         configurations = {
             'first-config': {
