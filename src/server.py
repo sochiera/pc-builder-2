@@ -82,6 +82,25 @@ def _page_template():
     memory_options = render_options(MEMORY)
     power_supply_options = render_options(POWER_SUPPLIES)
     case_options = render_options(CASES)
+    save_handler = (
+        "saveConfiguration.addEventListener('click',async()=>{"
+        "const generation=++saveGeneration;"
+        "const savedConfigurationShareLink=document.querySelector('#saved-configuration-share');"
+        "const setSavedConfigurationShareLink=url=>{savedConfigurationShareLink.hidden=!url;"
+        "savedConfigurationShareLink.textContent=url||'';if(url)savedConfigurationShareLink.href=url;"
+        "else savedConfigurationShareLink.removeAttribute('href')};setSavedConfigurationShareLink('');"
+        "const reportSaveError=message=>{refreshGeneration++;"
+        "result.textContent=message||'Nie udalo sie zapisac konfiguracji.';"
+        "result.dataset.level='blocking'};"
+        "try{const response=await fetch('/api/configurations',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify(selectedConfiguration())});const saved=await response.json();"
+        "if(generation!==saveGeneration)return;"
+        "if(response.ok===false){reportSaveError(saved.error);return}"
+        "configurationId.textContent=saved.configuration_id;result.textContent='';result.dataset.level='';"
+        "setSavedConfigurationShareLink(saved.share_url)}catch(error){if(generation!==saveGeneration)return;"
+        "reportSaveError();"
+        "}});"
+    )
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
@@ -97,9 +116,10 @@ def _page_template():
      <label for=budget>Budzet (PLN)</label><input id=budget type=text inputmode=numeric placeholder="Nie ustawiono">
      <output id=budget-result>Podaj budzet jako nieujemna calkowita kwote w PLN.</output>
      <p><button id=save-configuration type=button>Zapisz konfiguracje</button> <output id=configuration-id></output></p>
+      <p><a id=saved-configuration-share hidden></a></p>
      <label for=configuration-id-input>Identyfikator zapisanej konfiguracji</label><input id=configuration-id-input type=text>
      <button id=open-configuration type=button>Otworz konfiguracje</button>
-     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),budget=document.querySelector('#budget'),result=document.querySelector('#result'),budgetResult=document.querySelector('#budget-result'),totalCost=document.querySelector('#total-cost'),saveConfiguration=document.querySelector('#save-configuration'),configurationId=document.querySelector('#configuration-id'),configurationIdInput=document.querySelector('#configuration-id-input'),openConfiguration=document.querySelector('#open-configuration'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;function selectedConfiguration(){const configuration={};[['cpuId',cpu],['motherboardId',motherboard],['ramId',memory],['psuId',powerSupply],['caseId',caseSelect]].forEach(([name,select])=>{if(select.value)configuration[name]=select.value});if(budget.value)configuration.budgetPln=budget.value;return configuration}function applyConfiguration(configuration){const parts=configuration.parts||{};cpu.value=parts.cpuId||'';motherboard.value=parts.motherboardId||'';memory.value=parts.ramId||'';powerSupply.value=parts.psuId||'';caseSelect.value=parts.caseId||'';budget.value=configuration.budgetPln===undefined?'':configuration.budgetPln}async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams(selectedConfiguration());const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;budgetResult.textContent=analysis.budget.message;budgetResult.dataset.level=analysis.budget.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}saveConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(selectedConfiguration())});const saved=await response.json();configurationId.textContent=saved.configuration_id});openConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdInput.value));const saved=await response.json();applyConfiguration(saved);await refresh()});selects.forEach(select=>select.addEventListener('change',refresh));budget.addEventListener('change',refresh)</script>
+      <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),budget=document.querySelector('#budget'),result=document.querySelector('#result'),budgetResult=document.querySelector('#budget-result'),totalCost=document.querySelector('#total-cost'),saveConfiguration=document.querySelector('#save-configuration'),configurationId=document.querySelector('#configuration-id'),configurationIdInput=document.querySelector('#configuration-id-input'),openConfiguration=document.querySelector('#open-configuration'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;let saveGeneration=0;function selectedConfiguration(){const configuration={};[['cpuId',cpu],['motherboardId',motherboard],['ramId',memory],['psuId',powerSupply],['caseId',caseSelect]].forEach(([name,select])=>{if(select.value)configuration[name]=select.value});if(budget.value)configuration.budgetPln=budget.value;return configuration}function applyConfiguration(configuration){const parts=configuration.parts||{};cpu.value=parts.cpuId||'';motherboard.value=parts.motherboardId||'';memory.value=parts.ramId||'';powerSupply.value=parts.psuId||'';caseSelect.value=parts.caseId||'';budget.value=configuration.budgetPln===undefined?'':configuration.budgetPln}async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams(selectedConfiguration());const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;budgetResult.textContent=analysis.budget.message;budgetResult.dataset.level=analysis.budget.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}''' + save_handler + '''openConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdInput.value));const saved=await response.json();applyConfiguration(saved);await refresh()});selects.forEach(select=>select.addEventListener('change',refresh));budget.addEventListener('change',refresh)</script>
       <script>document.addEventListener('click',async event=>{if(event.target!==openConfiguration)return;event.stopImmediatePropagation();const configurationIdValue=configurationIdInput.value.trim();if(!configurationIdValue){result.textContent='Podaj identyfikator konfiguracji.';result.dataset.level='blocking';return}const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdValue));const configuration=await response.json();if(response.ok===false){result.textContent=configuration.error||'Nie udalo sie otworzyc konfiguracji.';result.dataset.level='blocking';return}applyConfiguration(configuration);refresh()},{capture:true})</script>
      </main></body></html>'''
 
@@ -109,12 +129,6 @@ def page():
     html = re.sub(
         r"<script>document\.addEventListener\('click'.*?</script>",
         '',
-        html,
-        flags=re.DOTALL,
-    )
-    html = re.sub(
-        r"saveConfiguration\.addEventListener\('click',async\(\)=>\{.*?\}\);openConfiguration\.addEventListener",
-        "saveConfiguration.addEventListener('click',async()=>{const response=await fetch('/api/configurations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(selectedConfiguration())});const saved=await response.json();if(response.ok===false){result.textContent=saved.error||'Nie udalo sie zapisac konfiguracji.';result.dataset.level='blocking';return}configurationId.textContent=saved.configuration_id});openConfiguration.addEventListener",
         html,
         flags=re.DOTALL,
     )

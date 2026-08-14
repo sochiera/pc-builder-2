@@ -449,6 +449,214 @@ class AppTest(unittest.TestCase):
         })
         self.assertEqual(status['saved']['budgetPln'], 5000)
 
+    def test_page_shows_replaces_and_clears_saved_configuration_share_link(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const save = document.querySelector('#save-configuration');
+                    const result = document.querySelector('#result');
+                    const responses = [
+                        {configuration_id: 'first-config', share_url: '/api/configurations/first-config'},
+                        {configuration_id: 'second-config', share_url: '/api/configurations/second-config'},
+                    ];
+                    let saveCount = 0;
+                    window.fetch = (url, options) => {
+                        if (url !== '/api/configurations' || options.method !== 'POST') {
+                            return Promise.reject(new Error('unexpected request'));
+                        }
+                        if (saveCount < responses.length) {
+                            return Promise.resolve({ok: true, json: () => Promise.resolve(responses[saveCount++])});
+                        }
+                        return Promise.resolve({
+                            ok: false,
+                            json: () => Promise.resolve({error: 'Nie udalo sie zapisac konfiguracji.'}),
+                        });
+                    };
+                    const shareLinks = () => Array.from(document.querySelectorAll('a'))
+                        .map(link => ({href: link.getAttribute('href'), text: link.textContent, hidden: link.hidden}));
+                    const waitFor = async predicate => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            if (predicate()) return true;
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        return false;
+                    };
+                    if (!save || !result) return {error: 'missing save controls'};
+                    save.click();
+                    await waitFor(() => shareLinks().some(link => link.href === '/api/configurations/first-config'));
+                    const first = shareLinks();
+                    save.click();
+                    await waitFor(() => shareLinks().some(link => link.href === '/api/configurations/second-config'));
+                    const second = shareLinks();
+                    save.click();
+                    await waitFor(() => result.textContent.includes('Nie udalo sie zapisac konfiguracji.'));
+                    return {first, second, failed: shareLinks(), error: result.textContent};
+                })()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertTrue(any(
+            link['href'] == '/api/configurations/first-config'
+            and link['text'] == '/api/configurations/first-config'
+            and link['hidden'] is False
+            for link in state['first']
+        ))
+        self.assertTrue(any(
+            link['href'] == '/api/configurations/second-config'
+            and link['text'] == '/api/configurations/second-config'
+            and link['hidden'] is False
+            for link in state['second']
+        ))
+        self.assertFalse(any(
+            link['href'] == '/api/configurations/first-config'
+            for link in state['second']
+        ))
+        self.assertFalse(any(
+            (link['href'] == '/api/configurations/first-config'
+             or link['href'] == '/api/configurations/second-config')
+            and link['hidden'] is False
+            for link in state['failed']
+        ))
+        self.assertTrue(all(link['hidden'] is True for link in state['failed']))
+        self.assertIn('Nie udalo sie zapisac konfiguracji.', state['error'])
+
+    def test_page_keeps_latest_started_save_after_responses_arrive_out_of_order(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const save = document.querySelector('#save-configuration');
+                    const identifier = document.querySelector('#configuration-id');
+                    const share = document.querySelector('#saved-configuration-share');
+                    const pending = [];
+                    window.fetch = (url, options) => {
+                        if (url !== '/api/configurations' || options.method !== 'POST') {
+                            return Promise.reject(new Error('unexpected request'));
+                        }
+                        return new Promise((resolve, reject) => pending.push({resolve, reject}));
+                    };
+                    if (!save || !identifier || !share) return {error: 'missing save controls'};
+                    save.click();
+                    save.click();
+                    if (pending.length !== 2) return {error: 'requests were not started'};
+                    pending[1].resolve({ok: true, json: () => Promise.resolve({
+                        configuration_id: 'latest-config',
+                        share_url: '/api/configurations/latest-config',
+                    })});
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    pending[0].resolve({ok: true, json: () => Promise.resolve({
+                        configuration_id: 'older-config',
+                        share_url: '/api/configurations/older-config',
+                    })});
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return {
+                        id: identifier.textContent,
+                        href: share.getAttribute('href'),
+                        text: share.textContent,
+                        hidden: share.hidden,
+                    };
+                })()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state['id'], 'latest-config')
+        self.assertEqual(state['href'], '/api/configurations/latest-config')
+        self.assertEqual(state['text'], '/api/configurations/latest-config')
+        self.assertFalse(state['hidden'])
+
+    def test_page_reports_rejected_save_and_keeps_share_link_hidden(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const save = document.querySelector('#save-configuration');
+                    const result = document.querySelector('#result');
+                    const share = document.querySelector('#saved-configuration-share');
+                    const cpu = document.querySelector('#cpu');
+                    let resolveAnalysis;
+                    window.fetch = (url, options) => {
+                        if (url.startsWith('/api/analyze?')) {
+                            return new Promise(resolve => { resolveAnalysis = resolve; });
+                        }
+                        if (url !== '/api/configurations' || options.method !== 'POST') {
+                            return Promise.reject(new Error('unexpected request'));
+                        }
+                        return Promise.reject(new Error('network unavailable'));
+                    };
+                    if (!save || !result || !share || !cpu) return {error: 'missing save controls'};
+                    cpu.value = 'core-i5-14600k';
+                    cpu.dispatchEvent(new Event('change'));
+                    save.click();
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                    resolveAnalysis({
+                        json: () => Promise.resolve({
+                            level: 'ok',
+                            message: 'Analiza zakonczona pomyslnie.',
+                            budget: {level: 'ok', message: 'Budzet nie ustawiony.'},
+                            total_cost_pln: 1599,
+                        }),
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return {
+                        message: result.textContent,
+                        level: result.dataset.level,
+                        href: share.getAttribute('href'),
+                        text: share.textContent,
+                        hidden: share.hidden,
+                    };
+                })()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state['message'], 'Nie udalo sie zapisac konfiguracji.')
+        self.assertEqual(state['level'], 'blocking')
+        self.assertIsNone(state['href'])
+        self.assertEqual(state['text'], '')
+        self.assertTrue(state['hidden'])
+
+    def test_page_clears_save_error_after_later_success(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const save = document.querySelector('#save-configuration');
+                    const result = document.querySelector('#result');
+                    let saveCount = 0;
+                    window.fetch = (url, options) => {
+                        if (url !== '/api/configurations' || options.method !== 'POST') {
+                            return Promise.reject(new Error('unexpected request'));
+                        }
+                        saveCount++;
+                        if (saveCount === 1) {
+                            return Promise.resolve({
+                                ok: false,
+                                json: () => Promise.resolve({error: 'Nie udalo sie zapisac konfiguracji.'}),
+                            });
+                        }
+                        return Promise.resolve({
+                            ok: true,
+                            json: () => Promise.resolve({
+                                configuration_id: 'recovered-config',
+                                share_url: '/api/configurations/recovered-config',
+                            }),
+                        });
+                    };
+                    if (!save || !result) return {error: 'missing save controls'};
+                    save.click();
+                    for (let attempt = 0; attempt < 200; attempt++) {
+                        if (result.dataset.level === 'blocking') break;
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    save.click();
+                    for (let attempt = 0; attempt < 200; attempt++) {
+                        if (document.querySelector('#saved-configuration-share').textContent) break;
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    return {message: result.textContent, level: result.dataset.level};
+                })()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertNotEqual(state['message'], 'Nie udalo sie zapisac konfiguracji.')
+        self.assertNotEqual(state['level'], 'blocking')
+
     def test_page_opens_saved_configuration_and_refreshes_visible_analysis(self):
         with Browser(self.base_url) as browser:
             state = browser.evaluate("""
