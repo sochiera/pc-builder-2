@@ -342,6 +342,44 @@ class AppTest(unittest.TestCase):
 
             self.assertEqual(json.loads(store.read_text(encoding='utf-8')), configurations)
 
+    def test_compare_configurations_reports_only_different_selected_parts(self):
+        configurations = {
+            'first-config': {
+                'configuration_id': 'first-config',
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+            'second-config': {
+                'configuration_id': 'second-config',
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'ramId': 'corsair-vengeance-ddr5',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=first-config&secondId=second-config'
+                )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(comparison.get('differences', {}).get('cpuId'), {
+            'first_id': 'ryzen-7-7800x3d',
+            'second_id': 'core-i5-14600k',
+        })
+        self.assertEqual(comparison.get('differences', {}).get('motherboardId'), {
+            'first_id': 'msi-b650',
+            'second_id': None,
+        })
+        self.assertNotIn('ramId', comparison.get('differences', {}))
+
     def test_compare_configurations_rejects_missing_or_duplicate_ids_without_partial_result(self):
         configurations = {
             'saved-config': {

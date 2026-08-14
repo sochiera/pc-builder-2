@@ -75,6 +75,19 @@ def configuration_cost(configuration):
     )
 
 
+def configuration_differences(first, second):
+    first_parts = first.get('parts', {})
+    second_parts = second.get('parts', {})
+    return {
+        field: {
+            'first_id': first_parts.get(field),
+            'second_id': second_parts.get(field),
+        }
+        for field in CONFIGURATION_CATALOGS
+        if first_parts.get(field) != second_parts.get(field)
+    }
+
+
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
@@ -88,6 +101,7 @@ def compare_configuration_costs(first_id, first, second_id, second):
             'second' if second_cost < first_cost else
             'tie'
         ),
+        'differences': configuration_differences(first, second),
     }
 
 
