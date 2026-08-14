@@ -72,7 +72,7 @@ Jako osoba składająca PC chcę zestawić koszty dwóch zapisanych konfiguracji
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy o różnych kosztach, porównaj je i potwierdź, że widzisz oba koszty oraz wskazanie tańszego zestawu.
 - Poza zakresem: porównanie wydajności i zgodności, różnice między pojedynczymi częściami, rekomendowanie wariantu, nazwy zestawów i porównanie więcej niż dwóch zestawów.
 
-## US-010 — Osoba składająca PC widzi różnice części między dwoma zestawami  [w toku]
+## US-010 — Osoba składająca PC widzi różnice części między dwoma zestawami  [do weryfikacji]
 
 Jako osoba składająca PC chcę zobaczyć, które części różnią dwa zapisane zestawy, żeby zrozumieć, z czego wynika wybór między wariantami.
 

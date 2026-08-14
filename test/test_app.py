@@ -765,6 +765,12 @@ class AppTest(unittest.TestCase):
                             first_cost_pln: 3975,
                             second_cost_pln: 3250,
                             cheaper: 'second',
+                            differences: {
+                                cpuId: {
+                                    first_id: 'ryzen-7-7800x3d',
+                                    second_id: 'core-i5-14600k',
+                                },
+                            },
                         }],
                         ['first-config|tie-config', {
                             first_configuration_id: 'first-config',
@@ -772,6 +778,12 @@ class AppTest(unittest.TestCase):
                             first_cost_pln: 3975,
                             second_cost_pln: 3975,
                             cheaper: 'tie',
+                            differences: {
+                                motherboardId: {
+                                    first_id: 'msi-b650',
+                                    second_id: 'asus-z790',
+                                },
+                            },
                         }],
                     ]);
                     window.fetch = url => {
@@ -806,13 +818,19 @@ class AppTest(unittest.TestCase):
                     const firstPair = await waitFor(() =>
                         output.textContent.includes('3975 PLN') &&
                         output.textContent.includes('3250 PLN') &&
-                        output.textContent.toLowerCase().includes('second')
+                        output.textContent.toLowerCase().includes('second') &&
+                        output.textContent.includes('AMD Ryzen 7 7800X3D') &&
+                        output.textContent.includes('Intel Core i5-14600K')
                     );
                     second.value = 'tie-config';
                     button.click();
                     const refreshedPair = await waitFor(() =>
                         output.textContent.includes('3975 PLN') &&
-                        !output.textContent.includes('3250 PLN')
+                        !output.textContent.includes('3250 PLN') &&
+                        output.textContent.includes('MSI B650') &&
+                        output.textContent.includes('ASUS Z790') &&
+                        !output.textContent.includes('AMD Ryzen 7 7800X3D') &&
+                        !output.textContent.includes('Intel Core i5-14600K')
                     );
                     const tie = await waitFor(() =>
                         output.textContent.toLowerCase().includes('tie') ||
@@ -834,6 +852,68 @@ class AppTest(unittest.TestCase):
         self.assertTrue(state['refreshedPair'], 'zmiana zapisu usuwa koszt poprzedniej pary')
         self.assertTrue(state['tie'], 'porownanie rownych kosztow pokazuje remis')
         self.assertTrue(state['unavailablePair'], 'nieudane porownanie czysci stary wynik i wyjasnia wymagane zapisy')
+
+    def test_page_shows_named_differences_and_omits_shared_parts(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const first = document.querySelector('#compare-first-id');
+                    const second = document.querySelector('#compare-second-id');
+                    const button = document.querySelector('#compare-configurations');
+                    const output = document.querySelector('#comparison-result');
+                    window.fetch = () => Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            first_configuration_id: 'first-config',
+                            second_configuration_id: 'second-config',
+                            first_cost_pln: 3975,
+                            second_cost_pln: 3250,
+                            cheaper: 'second',
+                            differences: {
+                                cpuId: {
+                                    category: 'CPU',
+                                    first_id: 'ryzen-7-7800x3d',
+                                    second_id: 'core-i5-14600k',
+                                },
+                                motherboardId: {
+                                    first_id: 'msi-b650',
+                                    second_id: null,
+                                },
+                            },
+                        }),
+                    });
+                    const waitFor = async predicate => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            if (predicate()) return true;
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        return false;
+                    };
+                    if (!first || !second || !button || !output) {
+                        return {controls: false, named: false, missing: false, shared: false};
+                    }
+                    first.value = 'first-config';
+                    second.value = 'second-config';
+                    button.click();
+                    const named = await waitFor(() =>
+                        output.textContent.includes('CPU') &&
+                        output.textContent.includes('AMD Ryzen 7 7800X3D') &&
+                        output.textContent.includes('Intel Core i5-14600K')
+                    );
+                    const missing = await waitFor(() =>
+                        output.textContent.includes('plyta glowna') &&
+                        output.textContent.includes('MSI B650') &&
+                        output.textContent.toLowerCase().includes('brak')
+                    );
+                    const shared = !output.textContent.includes('Corsair Vengeance DDR5');
+                    return {controls: true, named, missing, shared};
+                })()
+            """)
+
+        self.assertTrue(state['controls'], 'ekran udostepnia porownywarke')
+        self.assertTrue(state['named'], 'roznica pokazuje kategorie i nazwy obu wariantow')
+        self.assertTrue(state['missing'], 'jednostronny wybor pokazuje nazwe i brak drugiego wyboru')
+        self.assertTrue(state['shared'], 'wspolny wybor nie jest wyswietlany jako roznica')
 
     def test_page_keeps_latest_started_save_after_responses_arrive_out_of_order(self):
         with Browser(self.base_url) as browser:
