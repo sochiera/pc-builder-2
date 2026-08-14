@@ -449,6 +449,134 @@ class AppTest(unittest.TestCase):
         })
         self.assertEqual(status['saved']['budgetPln'], 5000)
 
+    def test_share_url_opens_saved_configuration_in_a_new_page_session(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            payload = {
+                'cpuId': 'ryzen-7-7800x3d',
+                'motherboardId': 'msi-b650',
+                'ramId': 'corsair-vengeance-ddr5',
+                'psuId': 'corsair-rm750x',
+                'caseId': 'atx-mid-tower',
+                'budgetPln': 5000,
+            }
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, saved = self.post_json('/api/configurations', payload)
+                self.assertEqual(status, 201)
+                with Browser(self.base_url + saved['share_url']) as browser:
+                    state = browser.evaluate("""
+                        (async () => {
+                            const waitForSavedBuild = async () => {
+                                for (let attempt = 0; attempt < 200; attempt++) {
+                                    const total = document.querySelector('#total-cost')?.textContent;
+                                    const result = document.querySelector('#result')?.textContent;
+                                    if (document.querySelector('#cpu')?.value === 'ryzen-7-7800x3d'
+                                        && document.querySelector('#motherboard')?.value === 'msi-b650'
+                                        && document.querySelector('#memory')?.value === 'corsair-vengeance-ddr5'
+                                        && document.querySelector('#power-supply')?.value === 'corsair-rm750x'
+                                        && document.querySelector('#case')?.value === 'atx-mid-tower'
+                                        && document.querySelector('#budget')?.value === '5000'
+                                        && total === '3975 PLN'
+                                        && result.includes('Socket AM5')) return;
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }
+                            };
+                            await waitForSavedBuild();
+                            return {
+                                cpu: document.querySelector('#cpu')?.value,
+                                motherboard: document.querySelector('#motherboard')?.value,
+                                memory: document.querySelector('#memory')?.value,
+                                powerSupply: document.querySelector('#power-supply')?.value,
+                                caseId: document.querySelector('#case')?.value,
+                                budget: document.querySelector('#budget')?.value,
+                                result: document.querySelector('#result')?.textContent,
+                                level: document.querySelector('#result')?.dataset.level,
+                                budgetResult: document.querySelector('#budget-result')?.textContent,
+                                total: document.querySelector('#total-cost')?.textContent,
+                            };
+                        })()
+                    """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state.get('cpu'), 'ryzen-7-7800x3d')
+        self.assertEqual(state.get('motherboard'), 'msi-b650')
+        self.assertEqual(state.get('memory'), 'corsair-vengeance-ddr5')
+        self.assertEqual(state.get('powerSupply'), 'corsair-rm750x')
+        self.assertEqual(state.get('caseId'), 'atx-mid-tower')
+        self.assertEqual(state.get('budget'), '5000')
+        self.assertEqual(state.get('total'), '3975 PLN')
+        self.assertEqual(state.get('level'), 'ok')
+        self.assertIn('Socket AM5 procesora i plyty glownej jest zgodny.', state.get('result', ''))
+        self.assertIn('Pamiec RAM DDR5 jest zgodna z plyta glowna.', state.get('result', ''))
+        self.assertIn('Moc zasilacza 750 W jest wystarczajaca', state.get('result', ''))
+        self.assertIn('Plyta w formacie ATX pasuje do obudowy.', state.get('result', ''))
+        self.assertIn('Zestaw miesci sie w budzecie', state.get('budgetResult', ''))
+        self.assertIn('pozostaje 1025 PLN', state.get('budgetResult', ''))
+
+    def test_invalid_share_url_reports_error_without_loading_saved_parts(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps({
+                'known-config': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'budgetPln': 5000,
+                },
+            }), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                with Browser(self.base_url + '/api/configurations/does-not-exist') as browser:
+                    state = browser.evaluate("""
+                        (async () => {
+                            for (let attempt = 0; attempt < 200; attempt++) {
+                                if (document.querySelector('#result')?.dataset.level === 'blocking') break;
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }
+                            return {
+                                cpu: document.querySelector('#cpu')?.value,
+                                motherboard: document.querySelector('#motherboard')?.value,
+                                memory: document.querySelector('#memory')?.value,
+                                powerSupply: document.querySelector('#power-supply')?.value,
+                                caseId: document.querySelector('#case')?.value,
+                                budget: document.querySelector('#budget')?.value,
+                                result: document.querySelector('#result')?.textContent,
+                                level: document.querySelector('#result')?.dataset.level,
+                            };
+                        })()
+                    """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state.get('cpu'), '')
+        self.assertEqual(state.get('motherboard'), '')
+        self.assertEqual(state.get('memory'), '')
+        self.assertEqual(state.get('powerSupply'), '')
+        self.assertEqual(state.get('caseId'), '')
+        self.assertEqual(state.get('budget'), '')
+        self.assertEqual(state.get('level'), 'blocking')
+        self.assertIn('Nie znaleziono konfiguracji', state.get('result', ''))
+
+    def test_page_without_share_identifier_opens_empty_configuration(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (() => ({
+                    cpu: document.querySelector('#cpu')?.value,
+                    motherboard: document.querySelector('#motherboard')?.value,
+                    memory: document.querySelector('#memory')?.value,
+                    powerSupply: document.querySelector('#power-supply')?.value,
+                    caseId: document.querySelector('#case')?.value,
+                    budget: document.querySelector('#budget')?.value,
+                    total: document.querySelector('#total-cost')?.textContent,
+                }))()
+            """)
+
+        self.assertIsInstance(state, dict)
+        self.assertEqual(
+            {state.get('cpu'), state.get('motherboard'), state.get('memory'), state.get('powerSupply'), state.get('caseId')},
+            {'', '', '', '', ''},
+        )
+        self.assertEqual(state.get('budget'), '')
+        self.assertEqual(state.get('total'), '0 PLN')
+
     def test_page_shows_replaces_and_clears_saved_configuration_share_link(self):
         with Browser(self.base_url) as browser:
             state = browser.evaluate("""

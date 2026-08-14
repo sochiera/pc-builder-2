@@ -47,10 +47,11 @@ def analyze_budget(budget_pln, build_cost):
             'message': 'Podaj budzet jako nieujemna calkowita kwote w PLN.',
         }
     if budget >= build_cost:
+        remaining = budget - build_cost
         return {
             'level': 'ok',
-            'message': f'Zestaw miesci sie w budzecie; pozostaje {budget - build_cost} PLN.',
-            'remaining_pln': budget - build_cost,
+            'message': f'Zestaw miesci sie w budzecie oraz pozostaje {remaining} PLN.',
+            'remaining_pln': remaining,
         }
 
     return {

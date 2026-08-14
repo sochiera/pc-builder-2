@@ -59,6 +59,14 @@ def configuration_share_url(configuration_id):
     return f'/api/configurations/{configuration_id}'
 
 
+def with_configuration_share_url(configuration_id, configuration):
+    if 'share_url' in configuration:
+        return configuration
+    shared = dict(configuration)
+    shared['share_url'] = configuration_share_url(configuration_id)
+    return shared
+
+
 def normalize_budget(value):
     if isinstance(value, str) and value.isascii() and value.isdecimal():
         try:
@@ -124,7 +132,7 @@ def _page_template():
      </main></body></html>'''
 
 
-def page():
+def page(configuration=None, error=None):
     html = _page_template()
     html = re.sub(
         r"<script>document\.addEventListener\('click'.*?</script>",
@@ -138,6 +146,13 @@ def page():
         html,
         flags=re.DOTALL,
     )
+    if configuration is not None:
+        html += '<script>applyConfiguration(' + json.dumps(configuration) + ');refresh();</script>'
+    elif error is not None:
+        html += (
+            '<script>result.textContent=' + json.dumps(error) +
+            ";result.dataset.level='blocking';</script>"
+        )
     return html
 
 
@@ -213,14 +228,23 @@ class AppHandler(BaseHTTPRequestHandler):
         if request.path.startswith(configuration_prefix):
             configuration_id = unquote(request.path[len(configuration_prefix):])
             saved = load_configurations().get(configuration_id)
+            wants_html = 'text/html' in self.headers.get('Accept', '')
             if saved is None:
+                if wants_html:
+                    self.respond(
+                        200,
+                        'text/html; charset=utf-8',
+                        page(error='Nie znaleziono konfiguracji.'),
+                    )
+                    return
                 self.respond(404, 'application/json; charset=utf-8', json.dumps({
                     'error': 'Nie znaleziono konfiguracji.',
                 }))
                 return
-            if 'share_url' not in saved:
-                saved = dict(saved)
-                saved['share_url'] = configuration_share_url(configuration_id)
+            saved = with_configuration_share_url(configuration_id, saved)
+            if wants_html:
+                self.respond(200, 'text/html; charset=utf-8', page(configuration=saved))
+                return
             self.respond(200, 'application/json; charset=utf-8', json.dumps(saved))
             return
         if request.path == '/api/analyze':
