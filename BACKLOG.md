@@ -1,5 +1,13 @@
 # Backlog
 
+## US-015 — Osoba składająca PC wybiera wariant mieszczący się w budżecie  [nowa]
+
+Jako osoba składająca PC chcę przy porównaniu dwóch zestawów bez blokujących konfliktów zobaczyć wskazanie wariantu mieszczącego się w swoim budżecie, żeby nie wybrać konfiguracji przekraczającej mój limit wydatków.
+
+- Dlaczego teraz: PROJECT.md uznaje budżet i rekomendacje za część wiarygodnego podsumowania, task-038 potwierdził odrębne oceny budżetów wariantów, a task-040 potwierdził rekomendację ograniczoną do blokujących konfliktów.
+- Sprawdzenie: uruchom demo, porównaj dwa zestawy bez blokujących konfliktów, z których tylko jeden mieści się w swoim budżecie, i potwierdź, że ekran wskazuje ten wariant, a przy dwóch zestawach mieszczących się w budżecie nie ogłasza zwycięzcy.
+- Poza zakresem: rekomendowanie na podstawie ceny, wysokości pozostałej kwoty, wydajności lub zastosowania, proponowanie zamienników i porównanie więcej niż dwóch zestawów.
+
 ## US-014 — Osoba składająca PC wybiera wariant bez blokującego konfliktu  [do weryfikacji]
 
 Jako osoba składająca PC chcę przy porównaniu zobaczyć wskazanie wariantu bez blokującego konfliktu, żeby nie wybrać zestawu, którego nie da się poprawnie złożyć.
