@@ -28,9 +28,9 @@ Docelowo konfigurator pozwala zbudowac, zapisac, udostepnic i porownac zestawy, 
 
 ## Co stoi
 
-Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Zachowanie, ponowne otwarcie i przekazanie zestawu drugiej osobie zostaly dostarczone do weryfikacji, a najblizsza nowa praca dotyczy porownania kosztow dwoch zapisanych zestawow.
+Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Zachowanie, ponowne otwarcie, przekazanie zestawu drugiej osobie i porownanie kosztow dwoch zapisanych zestawow zostaly dostarczone do weryfikacji. Najblizsza nowa praca ma pokazac, ktore czesci roznia dwa porownywane warianty.
 
-Backlog wyjatkowo ma dziewiec aktywnych historyjek, poniewaz osiem dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Utrzymujemy jeden cienki przyrost gotowy do pracy i nie poszerzamy kolejki ponownie do czasu zwolnienia miejsca przez weryfikacje.
+Backlog wyjatkowo ma dziesiec aktywnych historyjek, poniewaz dziewiec dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Utrzymujemy jeden cienki przyrost gotowy do pracy i nie poszerzamy kolejki ponownie do czasu zwolnienia miejsca przez weryfikacje.
 
 ## Kolejne prawdopodobne etapy
 

@@ -71,3 +71,11 @@ Jako osoba składająca PC chcę zestawić koszty dwóch zapisanych konfiguracji
 - Dlaczego teraz: PROJECT.md wymaga porównywania zapisanych konfiguracji jako wariantów, a zapis i udostępnianie zestawów zostały już dostarczone do weryfikacji.
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy o różnych kosztach, porównaj je i potwierdź, że widzisz oba koszty oraz wskazanie tańszego zestawu.
 - Poza zakresem: porównanie wydajności i zgodności, różnice między pojedynczymi częściami, rekomendowanie wariantu, nazwy zestawów i porównanie więcej niż dwóch zestawów.
+
+## US-010 — Osoba składająca PC widzi różnice części między dwoma zestawami  [nowa]
+
+Jako osoba składająca PC chcę zobaczyć, które części różnią dwa zapisane zestawy, żeby zrozumieć, z czego wynika wybór między wariantami.
+
+- Dlaczego teraz: PROJECT.md wymaga porównywania zapisanych konfiguracji jako wariantów, a porównanie kosztów dwóch zestawów zostało już dostarczone do weryfikacji bez pokazania różnic ich części.
+- Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że ekran wskazuje różną część oraz nie oznacza wspólnych wyborów jako różnic.
+- Poza zakresem: porównanie wydajności i zgodności, rekomendowanie wariantu, różnice cen pojedynczych części, nazwy zestawów i porównanie więcej niż dwóch zestawów.
