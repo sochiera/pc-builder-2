@@ -1,6 +1,6 @@
 # Backlog
 
-## US-018 — Osoba składająca PC otwiera zestaw z listy zapisanych wariantów  [w toku]
+## US-018 — Osoba składająca PC otwiera zestaw z listy zapisanych wariantów  [do weryfikacji]
 
 Jako osoba składająca PC chcę wybrać zapisany zestaw z listy rozpoznawalnych wariantów, żeby wrócić do niego bez pamiętania technicznego identyfikatora.
 

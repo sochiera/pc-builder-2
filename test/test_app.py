@@ -1426,6 +1426,203 @@ class AppTest(unittest.TestCase):
 
         self.assertTrue(state, 'porownanie po restarcie pokazuje nazwy i rekomendacje')
 
+    def test_page_lists_and_opens_named_configurations_after_app_restart(self):
+        first_payload = {
+            'name': 'Zestaw do pracy',
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+        second_payload = {
+            'name': 'Zestaw gamingowy',
+            'cpuId': 'core-i5-14600k',
+            'motherboardId': 'asus-z790',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 3000,
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                first_status, first_saved = self.post_json(
+                    '/api/configurations', first_payload
+                )
+                second_status, second_saved = self.post_json(
+                    '/api/configurations', second_payload
+                )
+                self.assertEqual(first_status, 201)
+                self.assertEqual(second_status, 201)
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with Browser(restarted_url) as browser:
+                        state = browser.evaluate(f"""
+                            (async () => {{
+                                const list = document.querySelector('#saved-configurations');
+                                if (!list) return {{list: false}};
+                                for (let attempt = 0; attempt < 200 &&
+                                    list.querySelectorAll('[data-configuration-id]').length < 2; attempt++) {{
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }}
+                                const entries = [...list.querySelectorAll('[data-configuration-id]')];
+                                const names = list.textContent;
+                                const states = [];
+                                for (const id of ['{first_saved['configuration_id']}', '{second_saved['configuration_id']}']) {{
+                                    const entry = list.querySelector(`[data-configuration-id="${{id}}"]`);
+                                    if (!entry) return {{list: true, names, entries: entries.length, states}};
+                                    entry.click();
+                                    const expectedCpu = id === '{first_saved['configuration_id']}'
+                                        ? '{first_payload['cpuId']}' : '{second_payload['cpuId']}';
+                                    const expectedBudget = id === '{first_saved['configuration_id']}'
+                                        ? '{first_payload['budgetPln']}' : '{second_payload['budgetPln']}';
+                                    const expectedCost = id === '{first_saved['configuration_id']}'
+                                        ? '3975 PLN' : '3825 PLN';
+                                    for (let attempt = 0; attempt < 200 &&
+                                        (document.querySelector('#cpu').value !== expectedCpu ||
+                                         document.querySelector('#budget').value !== expectedBudget ||
+                                         document.querySelector('#total-cost').textContent !== expectedCost); attempt++) {{
+                                        await new Promise(resolve => setTimeout(resolve, 10));
+                                    }}
+                                    states.push({{
+                                        id,
+                                        cpu: document.querySelector('#cpu').value,
+                                        motherboard: document.querySelector('#motherboard').value,
+                                        memory: document.querySelector('#memory').value,
+                                        powerSupply: document.querySelector('#power-supply').value,
+                                        caseId: document.querySelector('#case').value,
+                                        budget: document.querySelector('#budget').value,
+                                        cost: document.querySelector('#total-cost').textContent,
+                                        result: document.querySelector('#result').textContent,
+                                        budgetResult: document.querySelector('#budget-result').textContent,
+                                    }});
+                                }}
+                                return {{list: true, names, entries: entries.length, states}};
+                            }})()
+                        """)
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+        self.assertTrue(state['list'], 'ekran udostepnia liste zapisow')
+        self.assertEqual(state['entries'], 2)
+        self.assertIn('Zestaw do pracy', state['names'])
+        self.assertIn('Zestaw gamingowy', state['names'])
+        expected_states = [
+            {
+                'id': first_saved['configuration_id'],
+                'cpu': first_payload['cpuId'],
+                'motherboard': first_payload['motherboardId'],
+                'memory': first_payload['ramId'],
+                'powerSupply': first_payload['psuId'],
+                'caseId': first_payload['caseId'],
+                'budget': str(first_payload['budgetPln']),
+                'cost': '3975 PLN',
+            },
+            {
+                'id': second_saved['configuration_id'],
+                'cpu': second_payload['cpuId'],
+                'motherboard': second_payload['motherboardId'],
+                'memory': second_payload['ramId'],
+                'powerSupply': second_payload['psuId'],
+                'caseId': second_payload['caseId'],
+                'budget': str(second_payload['budgetPln']),
+                'cost': '3825 PLN',
+            },
+        ]
+        for actual, expected in zip(state['states'], expected_states):
+            for field, value in expected.items():
+                self.assertEqual(actual[field], value)
+        self.assertIn('Socket AM5 procesora i plyty glownej jest zgodny.', state['states'][0]['result'])
+        self.assertIn('Pamiec RAM DDR5 jest zgodna z plyta glowna.', state['states'][0]['result'])
+        self.assertIn('Moc zasilacza 750 W jest wystarczajaca; zestaw wymaga 210 W.', state['states'][0]['result'])
+        self.assertIn('Plyta w formacie ATX pasuje do obudowy.', state['states'][0]['result'])
+        self.assertIn('1025 PLN', state['states'][0]['budgetResult'])
+        self.assertIn('Socket LGA1700 procesora i plyty glownej jest zgodny.', state['states'][1]['result'])
+        self.assertIn('Pamiec RAM DDR5 jest zgodna z plyta glowna.', state['states'][1]['result'])
+        self.assertIn('Moc zasilacza 750 W jest wystarczajaca; zestaw wymaga 205 W.', state['states'][1]['result'])
+        self.assertIn('Plyta w formacie ATX pasuje do obudowy.', state['states'][1]['result'])
+        self.assertIn('825 PLN', state['states'][1]['budgetResult'])
+
+    def test_page_communicates_empty_named_configuration_list(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                with Browser(self.base_url) as browser:
+                    state = browser.evaluate("""
+                        (async () => {
+                            const list = document.querySelector('#saved-configurations');
+                            if (!list) return {list: false};
+                            for (let attempt = 0; attempt < 200 &&
+                                list.textContent.includes('Wczytywanie'); attempt++) {
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }
+                            return {list: true, text: list.textContent};
+                        })()
+                    """)
+
+        self.assertTrue(state['list'])
+        self.assertIn('Brak nazwanych zapisow do wyboru.', state['text'])
+
+    def test_page_opens_named_configuration_from_keyboard_control(self):
+        payload = {
+            'name': 'Zestaw klawiaturowy',
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, saved = self.post_json('/api/configurations', payload)
+                self.assertEqual(status, 201)
+                with Browser(self.base_url) as browser:
+                    state = browser.evaluate(f"""
+                        (async () => {{
+                            const list = document.querySelector('#saved-configurations');
+                            for (let attempt = 0; attempt < 200 &&
+                                !list.querySelector('[data-configuration-id]'); attempt++) {{
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }}
+                            const entry = list.querySelector('[data-configuration-id]');
+                            if (!entry) return {{entry: false}};
+                            entry.focus();
+                            entry.dispatchEvent(new KeyboardEvent('keydown', {{
+                                key: 'Enter', bubbles: true
+                            }}));
+                            for (let attempt = 0; attempt < 200 &&
+                                document.querySelector('#cpu').value !== '{payload['cpuId']}'; attempt++) {{
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }}
+                            return {{
+                                entry: true,
+                                tag: entry.tagName,
+                                tabIndex: entry.tabIndex,
+                                cpu: document.querySelector('#cpu').value,
+                            }};
+                        }})()
+                    """)
+
+        self.assertTrue(state['entry'])
+        self.assertIn(state['tag'], ('BUTTON', 'A'))
+        self.assertGreaterEqual(state['tabIndex'], 0)
+        self.assertEqual(state['cpu'], payload['cpuId'])
+
     def test_page_saves_configuration_without_empty_name(self):
         with Browser(self.base_url) as browser:
             state = browser.evaluate("""
