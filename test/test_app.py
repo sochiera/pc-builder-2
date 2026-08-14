@@ -828,6 +828,9 @@ class AppTest(unittest.TestCase):
                                 cpuId: {
                                     first_id: 'ryzen-7-7800x3d',
                                     second_id: 'core-i5-14600k',
+                                    first_price_pln: 1599,
+                                    second_price_pln: 1249,
+                                    price_difference_pln: 350,
                                 },
                             },
                         }],
@@ -841,6 +844,9 @@ class AppTest(unittest.TestCase):
                                 motherboardId: {
                                     first_id: 'msi-b650',
                                     second_id: 'asus-z790',
+                                    first_price_pln: 899,
+                                    second_price_pln: 1099,
+                                    price_difference_pln: -200,
                                 },
                             },
                         }],
@@ -879,7 +885,10 @@ class AppTest(unittest.TestCase):
                         output.textContent.includes('3250 PLN') &&
                         output.textContent.toLowerCase().includes('second') &&
                         output.textContent.includes('AMD Ryzen 7 7800X3D') &&
-                        output.textContent.includes('Intel Core i5-14600K')
+                        output.textContent.includes('Intel Core i5-14600K') &&
+                        output.textContent.includes('1599 PLN') &&
+                        output.textContent.includes('1249 PLN') &&
+                        output.textContent.includes('+350 PLN')
                     );
                     second.value = 'tie-config';
                     button.click();
@@ -888,6 +897,12 @@ class AppTest(unittest.TestCase):
                         !output.textContent.includes('3250 PLN') &&
                         output.textContent.includes('MSI B650') &&
                         output.textContent.includes('ASUS Z790') &&
+                        output.textContent.includes('899 PLN') &&
+                        output.textContent.includes('1099 PLN') &&
+                        output.textContent.includes('-200 PLN') &&
+                        !output.textContent.includes('1599 PLN') &&
+                        !output.textContent.includes('1249 PLN') &&
+                        !output.textContent.includes('+350 PLN') &&
                         !output.textContent.includes('AMD Ryzen 7 7800X3D') &&
                         !output.textContent.includes('Intel Core i5-14600K')
                     );
@@ -933,10 +948,16 @@ class AppTest(unittest.TestCase):
                                     category: 'CPU',
                                     first_id: 'ryzen-7-7800x3d',
                                     second_id: 'core-i5-14600k',
+                                    first_price_pln: 1599,
+                                    second_price_pln: 1249,
+                                    price_difference_pln: 350,
                                 },
                                 motherboardId: {
                                     first_id: 'msi-b650',
                                     second_id: null,
+                                    first_price_pln: 899,
+                                    second_price_pln: 0,
+                                    price_difference_pln: 899,
                                 },
                             },
                         }),
@@ -957,12 +978,17 @@ class AppTest(unittest.TestCase):
                     const named = await waitFor(() =>
                         output.textContent.includes('CPU') &&
                         output.textContent.includes('AMD Ryzen 7 7800X3D') &&
-                        output.textContent.includes('Intel Core i5-14600K')
+                        output.textContent.includes('Intel Core i5-14600K') &&
+                        output.textContent.includes('1599 PLN') &&
+                        output.textContent.includes('1249 PLN') &&
+                        output.textContent.includes('350 PLN')
                     );
                     const missing = await waitFor(() =>
                         output.textContent.includes('plyta glowna') &&
                         output.textContent.includes('MSI B650') &&
-                        output.textContent.toLowerCase().includes('brak')
+                        output.textContent.toLowerCase().includes('brak') &&
+                        output.textContent.includes('899 PLN') &&
+                        output.textContent.includes('0 PLN')
                     );
                     const shared = !output.textContent.includes('Corsair Vengeance DDR5');
                     return {controls: true, named, missing, shared};

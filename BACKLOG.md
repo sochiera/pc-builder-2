@@ -80,7 +80,7 @@ Jako osoba składająca PC chcę zobaczyć, które części różnią dwa zapisa
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że ekran wskazuje różną część oraz nie oznacza wspólnych wyborów jako różnic.
 - Poza zakresem: porównanie wydajności i zgodności, rekomendowanie wariantu, różnice cen pojedynczych części, nazwy zestawów i porównanie więcej niż dwóch zestawów.
 
-## US-011 — Osoba składająca PC widzi różnice cen części między dwoma zestawami  [w toku]
+## US-011 — Osoba składająca PC widzi różnice cen części między dwoma zestawami  [do weryfikacji]
 
 Jako osoba składająca PC chcę przy każdej różniącej się części zobaczyć ceny obu wariantów, żeby zrozumieć, które wybory odpowiadają za różnicę kosztu zestawów.
 
