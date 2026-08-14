@@ -1,5 +1,13 @@
 # Backlog
 
+## US-018 — Osoba składająca PC otwiera zestaw z listy zapisanych wariantów  [nowa]
+
+Jako osoba składająca PC chcę wybrać zapisany zestaw z listy rozpoznawalnych wariantów, żeby wrócić do niego bez pamiętania technicznego identyfikatora.
+
+- Dlaczego teraz: PROJECT.md wymaga zapisywalnych wariantów, a raport task-048 potwierdził trwałe nazwy zestawów, lecz powrót do zapisu nadal wymaga ręcznego podania jego identyfikatora.
+- Sprawdzenie: uruchom demo, zapisz dwa różnie nazwane zestawy, uruchom demo ponownie, wybierz jeden z nich z widocznej listy i potwierdź, że otwierają się jego części oraz budżet.
+- Poza zakresem: usuwanie, zmiana nazwy, wyszukiwanie i sortowanie zapisów, konta użytkowników, wybór zestawów do porównania z listy oraz stronicowanie.
+
 ## US-017 — Osoba składająca PC rozpoznaje nazwane warianty w porównaniu  [do weryfikacji]
 
 Jako osoba składająca PC chcę nadać nazwy zapisanym zestawom i widzieć je podczas porównania, żeby łatwo rozpoznać warianty oraz rekomendowany wybór.
