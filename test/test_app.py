@@ -200,12 +200,72 @@ class AppTest(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertTrue(saved.get('configuration_id'))
         self.assertEqual(saved.get('parts'), {'cpuId': 'core-i5-14600k'})
+        self.assertNotIn('name', saved)
         self.assertNotIn('budgetPln', saved)
         self.assertEqual(
             saved.get('share_url'),
             f"/api/configurations/{saved['configuration_id']}",
         )
         self.assertNotEqual(saved['share_url'], first_share_url)
+
+    def test_named_configuration_is_persisted_after_app_restart(self):
+        payload = {
+            'name': 'Wydajny zestaw do pracy',
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'budgetPln': 5000,
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, saved = self.post_json('/api/configurations', payload)
+
+                self.assertEqual(status, 201)
+                self.assertTrue(saved.get('configuration_id'))
+                self.assertEqual(saved.get('name'), payload['name'])
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with urlopen(
+                        f"{restarted_url}/api/configurations/{saved['configuration_id']}"
+                    ) as response:
+                        self.assertEqual(response.status, 200)
+                        reopened = json.loads(response.read())
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+                self.assertEqual(reopened['name'], payload['name'])
+                self.assertEqual(reopened['parts'], {
+                    key: value for key, value in payload.items()
+                    if key.endswith('Id')
+                })
+                self.assertEqual(reopened['budgetPln'], payload['budgetPln'])
+
+
+    def test_configuration_save_rejects_invalid_names_without_creating_one(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                for invalid_name in ('', None, 42):
+                    with self.subTest(invalid_name=invalid_name):
+                        before = store.read_bytes()
+                        status, response = self.post_json(
+                            '/api/configurations',
+                            {'name': invalid_name, 'cpuId': 'core-i5-14600k'},
+                        )
+                        self.assertEqual(status, 400)
+                        self.assertIn('name', response.get('error', '').lower())
+                        self.assertEqual(store.read_bytes(), before)
 
     def test_configuration_can_be_opened_after_save_and_app_restart(self):
         payload = {

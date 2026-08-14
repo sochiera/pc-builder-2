@@ -396,6 +396,13 @@ class AppHandler(BaseHTTPRequestHandler):
             }))
             return
 
+        name = payload.get('name')
+        if 'name' in payload and (not isinstance(name, str) or not name):
+            self.respond(400, 'application/json; charset=utf-8', json.dumps({
+                'error': 'Pole name musi byc niepustym tekstem.',
+            }))
+            return
+
         parts = {}
         for field, products in CONFIGURATION_CATALOGS.items():
             if field not in payload:
@@ -425,6 +432,8 @@ class AppHandler(BaseHTTPRequestHandler):
             'parts': parts,
             'share_url': configuration_share_url(configuration_id),
         }
+        if 'name' in payload:
+            saved['name'] = name
         if 'budgetPln' in payload:
             saved['budgetPln'] = budget
         self.server.configurations[configuration_id] = saved
