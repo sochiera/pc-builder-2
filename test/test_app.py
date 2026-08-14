@@ -1618,6 +1618,108 @@ class AppTest(unittest.TestCase):
         self.assertIn('Zestaw do pracy', state['secondNames'])
         self.assertIn('Zestaw gamingowy', state['secondNames'])
 
+    def test_page_compares_currently_selected_named_configurations_and_rejects_duplicate(self):
+        payloads = [
+            {
+                'name': 'Zestaw do pracy',
+                'cpuId': 'ryzen-7-7800x3d',
+                'motherboardId': 'msi-b650',
+            },
+            {
+                'name': 'Zestaw gamingowy',
+                'cpuId': 'core-i5-14600k',
+                'motherboardId': 'asus-z790',
+            },
+            {
+                'name': 'Zestaw cichy',
+                'cpuId': 'ryzen-7-7800x3d',
+                'motherboardId': 'msi-b650',
+            },
+        ]
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                saved = []
+                for payload in payloads:
+                    status, configuration = self.post_json('/api/configurations', payload)
+                    self.assertEqual(status, 201)
+                    saved.append(configuration)
+
+                with Browser(self.base_url) as browser:
+                    state = browser.evaluate(f"""
+                        (async () => {{
+                            const first = document.querySelector('#compare-first-id');
+                            const second = document.querySelector('#compare-second-id');
+                            const button = document.querySelector('#compare-configurations');
+                            const output = document.querySelector('#comparison-result');
+                            if (!first || !second || !button || !output) return {{controls: false}};
+                            for (let attempt = 0; attempt < 200 &&
+                                (![...first.options].some(option => option.value === '{saved[0]['configuration_id']}') ||
+                                 ![...first.options].some(option => option.value === '{saved[1]['configuration_id']}') ||
+                                 ![...first.options].some(option => option.value === '{saved[2]['configuration_id']}') ||
+                                 ![...second.options].some(option => option.value === '{saved[0]['configuration_id']}') ||
+                                 ![...second.options].some(option => option.value === '{saved[1]['configuration_id']}') ||
+                                 ![...second.options].some(option => option.value === '{saved[2]['configuration_id']}')); attempt++) {{
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }}
+                            const optionsLoaded =
+                                [...first.options].some(option => option.value === '{saved[0]['configuration_id']}') &&
+                                [...first.options].some(option => option.value === '{saved[1]['configuration_id']}') &&
+                                [...first.options].some(option => option.value === '{saved[2]['configuration_id']}') &&
+                                [...second.options].some(option => option.value === '{saved[0]['configuration_id']}') &&
+                                [...second.options].some(option => option.value === '{saved[1]['configuration_id']}') &&
+                                [...second.options].some(option => option.value === '{saved[2]['configuration_id']}');
+                            if (!optionsLoaded) return {{controls: true, optionsLoaded: false}};
+                            first.value = '{saved[0]['configuration_id']}';
+                            second.value = '{saved[1]['configuration_id']}';
+                            button.click();
+                            for (let attempt = 0; attempt < 200 &&
+                                (!output.textContent.includes('Zestaw do pracy') ||
+                                 !output.textContent.includes('Zestaw gamingowy')); attempt++) {{
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }}
+                            const firstResult = output.textContent;
+                            first.value = '{saved[2]['configuration_id']}';
+                            button.click();
+                            for (let attempt = 0; attempt < 200 &&
+                                (!output.textContent.includes('Zestaw cichy') ||
+                                 output.textContent.includes('Zestaw do pracy')); attempt++) {{
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }}
+                            const secondResult = output.textContent;
+                            let requests = 0;
+                            const originalFetch = window.fetch;
+                            window.fetch = (...args) => {{
+                                requests++;
+                                return originalFetch(...args);
+                            }};
+                            second.value = first.value;
+                            button.click();
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                            window.fetch = originalFetch;
+                            return {{
+                                controls: true,
+                                optionsLoaded,
+                                firstResult,
+                                secondResult,
+                                duplicateResult: output.textContent,
+                                duplicateRequests: requests,
+                            }};
+                        }})()
+                    """)
+
+        self.assertTrue(state['controls'])
+        self.assertTrue(state['optionsLoaded'])
+        self.assertIn('Zestaw do pracy', state['firstResult'])
+        self.assertIn('Zestaw gamingowy', state['firstResult'])
+        self.assertIn('Zestaw cichy', state['secondResult'])
+        self.assertIn('Zestaw gamingowy', state['secondResult'])
+        self.assertNotIn('Zestaw do pracy', state['secondResult'])
+        self.assertEqual(state['duplicateRequests'], 0)
+        self.assertIn('dwa rozne', state['duplicateResult'])
+
     def test_page_communicates_empty_named_configuration_list(self):
         with TemporaryDirectory() as directory:
             store = Path(directory) / 'configurations.json'
