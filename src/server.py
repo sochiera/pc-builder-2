@@ -80,6 +80,16 @@ def configuration_name(configuration):
     return configuration.get('name')
 
 
+def named_configurations(configurations):
+    return [
+        {'configuration_id': configuration_id, 'name': configuration['name']}
+        for configuration_id, configuration in configurations.items()
+        if isinstance(configuration, dict)
+        and isinstance(configuration.get('name'), str)
+        and configuration['name']
+    ]
+
+
 def configuration_differences(first, second):
     first_parts = first.get('parts', {})
     second_parts = second.get('parts', {})
@@ -446,6 +456,13 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         request = urlparse(self.path)
+        if request.path == '/api/configurations':
+            self.respond(
+                200,
+                'application/json; charset=utf-8',
+                json.dumps(named_configurations(load_configurations())),
+            )
+            return
         if request.path == '/api/compare':
             query = parse_qs(request.query, keep_blank_values=True)
             first_id = query.get('firstId', [''])[0]

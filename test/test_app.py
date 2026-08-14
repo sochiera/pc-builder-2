@@ -250,6 +250,62 @@ class AppTest(unittest.TestCase):
                 })
                 self.assertEqual(reopened['budgetPln'], payload['budgetPln'])
 
+    def test_configuration_list_returns_named_variants_only(self):
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                named_status, named = self.post_json('/api/configurations', {
+                    'name': 'Zestaw do pracy',
+                    'cpuId': 'core-i5-14600k',
+                })
+                unnamed_status, unnamed = self.post_json('/api/configurations', {
+                    'cpuId': 'ryzen-7-7800x3d',
+                })
+
+                self.assertEqual(named_status, 201)
+                self.assertEqual(unnamed_status, 201)
+                list_status, configurations = self.get_json('/api/configurations')
+
+                self.assertEqual(list_status, 200)
+                self.assertIsInstance(configurations, list)
+                self.assertEqual(
+                    {
+                        (configuration['configuration_id'], configuration['name'])
+                        for configuration in configurations
+                    },
+                    {(named['configuration_id'], 'Zestaw do pracy')},
+                )
+                self.assertNotIn(
+                    unnamed['configuration_id'],
+                    {configuration['configuration_id'] for configuration in configurations},
+                )
+
+                restarted_app = create_app(port=0)
+                restarted_thread = Thread(target=restarted_app.serve_forever)
+                restarted_thread.start()
+                try:
+                    restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+                    with urlopen(f'{restarted_url}/api/configurations') as response:
+                        self.assertEqual(response.status, 200)
+                        restarted_configurations = json.loads(response.read())
+                finally:
+                    restarted_app.shutdown()
+                    restarted_thread.join()
+                    restarted_app.server_close()
+
+                self.assertEqual(
+                    {
+                        (configuration['configuration_id'], configuration['name'])
+                        for configuration in restarted_configurations
+                    },
+                    {(named['configuration_id'], 'Zestaw do pracy')},
+                )
+                self.assertNotIn(
+                    unnamed['configuration_id'],
+                    {configuration['configuration_id'] for configuration in restarted_configurations},
+                )
+
 
     def test_configuration_save_rejects_invalid_names_without_creating_one(self):
         with TemporaryDirectory() as directory:
