@@ -1,5 +1,13 @@
 # Backlog
 
+## US-014 — Osoba składająca PC wybiera wariant bez blokującego konfliktu  [nowa]
+
+Jako osoba składająca PC chcę przy porównaniu zobaczyć wskazanie wariantu bez blokującego konfliktu, żeby nie wybrać zestawu, którego nie da się poprawnie złożyć.
+
+- Dlaczego teraz: PROJECT.md uznaje rekomendacje za część wiarygodnego podsumowania, a raport task-036 potwierdził odrębną ocenę zgodności wariantów bez wskazania bezpieczniejszego wyboru.
+- Sprawdzenie: uruchom demo, porównaj zgodny zapis z zapisem mającym blokujący konflikt i potwierdź, że ekran wskazuje zgodny wariant, a przy dwóch zgodnych zapisach nie ogłasza zwycięzcy.
+- Poza zakresem: rekomendowanie na podstawie ceny, budżetu, wydajności lub zastosowania, naprawianie konfliktów i porównanie więcej niż dwóch zestawów.
+
 ## US-001 — Osoba składająca PC sprawdza zgodność konkretnych części  [do weryfikacji]
 
 Jako osoba składająca PC chcę wybrać konkretny procesor i płytę główną, żeby przed zakupem zobaczyć, czy mogą działać razem.
