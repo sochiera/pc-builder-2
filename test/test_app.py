@@ -355,8 +355,30 @@ class AppTest(unittest.TestCase):
                     'caseId': 'atx-mid-tower',
                 },
             },
+            'compatible-config-copy': {
+                'configuration_id': 'compatible-config-copy',
+                'budgetPln': 1,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
             'conflicting-config': {
                 'configuration_id': 'conflicting-config',
+                'budgetPln': 99999,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'conflicting-config-copy': {
+                'configuration_id': 'conflicting-config-copy',
                 'budgetPln': 99999,
                 'parts': {
                     'cpuId': 'core-i5-14600k',
@@ -376,13 +398,37 @@ class AppTest(unittest.TestCase):
                     '/api/compare?firstId=compatible-config&secondId=conflicting-config'
                 )
 
-        self.assertEqual(status, 200)
-        self.assertIn('first_compatibility', comparison)
-        self.assertIn('second_compatibility', comparison)
-        self.assertEqual(comparison['first_compatibility']['level'], 'ok')
-        self.assertIn('zgodny', comparison['first_compatibility']['message'])
-        self.assertEqual(comparison['second_compatibility']['level'], 'blocking')
-        self.assertIn('socket', comparison['second_compatibility']['message'])
+                self.assertEqual(status, 200)
+                self.assertIn('first_compatibility', comparison)
+                self.assertIn('second_compatibility', comparison)
+                self.assertEqual(comparison['first_compatibility']['level'], 'ok')
+                self.assertIn('zgodny', comparison['first_compatibility']['message'])
+                self.assertEqual(comparison['second_compatibility']['level'], 'blocking')
+                self.assertIn('socket', comparison['second_compatibility']['message'])
+
+                self.assertEqual(
+                    comparison.get('recommended_configuration_id'), 'compatible-config'
+                )
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=conflicting-config&secondId=compatible-config'
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(
+                    comparison.get('recommended_configuration_id'), 'compatible-config'
+                )
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=compatible-config&secondId=compatible-config-copy'
+                )
+                self.assertEqual(status, 200)
+                self.assertIsNone(comparison['recommended_configuration_id'])
+
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=conflicting-config&secondId=conflicting-config-copy'
+                )
+                self.assertEqual(status, 200)
+                self.assertIsNone(comparison['recommended_configuration_id'])
 
     def test_compare_configurations_reports_each_saved_budget_independently(self):
         configurations = {
@@ -922,10 +968,11 @@ class AppTest(unittest.TestCase):
                     const button = document.querySelector('#compare-configurations');
                     const output = document.querySelector('#comparison-result');
                     const responses = new Map([
-                        ['first-config|second-config', {
-                            first_configuration_id: 'first-config',
-                            second_configuration_id: 'second-config',
-                            first_cost_pln: 3975,
+                         ['first-config|second-config', {
+                             first_configuration_id: 'first-config',
+                             second_configuration_id: 'second-config',
+                             recommended_configuration_id: 'first-config',
+                             first_cost_pln: 3975,
                             second_cost_pln: 3250,
                             cheaper: 'second',
                              first_compatibility: {
@@ -954,10 +1001,11 @@ class AppTest(unittest.TestCase):
                                 },
                             },
                         }],
-                        ['first-config|tie-config', {
-                            first_configuration_id: 'first-config',
-                            second_configuration_id: 'tie-config',
-                            first_cost_pln: 3975,
+                         ['first-config|tie-config', {
+                             first_configuration_id: 'first-config',
+                             second_configuration_id: 'tie-config',
+                             recommended_configuration_id: null,
+                             first_cost_pln: 3975,
                             second_cost_pln: 3975,
                             cheaper: 'tie',
                              first_compatibility: {
@@ -984,9 +1032,34 @@ class AppTest(unittest.TestCase):
                                     second_price_pln: 1099,
                                     price_difference_pln: -200,
                                 },
-                            },
-                        }],
-                    ]);
+                             },
+                         }],
+                         ['second-config|first-config', {
+                             first_configuration_id: 'second-config',
+                             second_configuration_id: 'first-config',
+                             recommended_configuration_id: 'first-config',
+                             first_cost_pln: 3250,
+                             second_cost_pln: 3975,
+                             cheaper: 'first',
+                             first_compatibility: {
+                                 level: 'blocking',
+                                 message: 'Pierwszy zestaw ma konflikt socketu.',
+                             },
+                             first_budget: {
+                                 level: 'blocking',
+                                 message: 'Budzet przekroczony o 825 PLN.',
+                             },
+                             second_compatibility: {
+                                 level: 'ok',
+                                 message: 'Drugi zestaw jest zgodny.',
+                             },
+                             second_budget: {
+                                 level: 'ok',
+                                 message: 'Budzet wystarcza; pozostaje 1025 PLN.',
+                             },
+                             differences: {},
+                         }],
+                     ]);
                     window.fetch = url => {
                         const query = new URL(url, window.location).searchParams;
                         const key = query.get('firstId') + '|' + query.get('secondId');
@@ -1018,7 +1091,7 @@ class AppTest(unittest.TestCase):
                     first.value = 'first-config';
                     second.value = 'second-config';
                     button.click();
-                    const firstPair = await waitFor(() =>
+                     const firstPair = await waitFor(() =>
                         output.textContent.includes('3975 PLN') &&
                         output.textContent.includes('3250 PLN') &&
                         output.textContent.toLowerCase().includes('second') &&
@@ -1026,8 +1099,9 @@ class AppTest(unittest.TestCase):
                         output.textContent.includes('Intel Core i5-14600K') &&
                         output.textContent.includes('1599 PLN') &&
                         output.textContent.includes('1249 PLN') &&
-                        output.textContent.includes('+350 PLN')
-                    );
+                         output.textContent.includes('+350 PLN')
+                     );
+                     const firstRecommendation = output.textContent.includes('Rekomendowany wariant: first-config');
                      const firstCompatibility = await waitFor(() =>
                          output.textContent.includes('Pierwszy wariant: ok') &&
                          output.textContent.includes('Drugi wariant: blocking') &&
@@ -1041,6 +1115,13 @@ class AppTest(unittest.TestCase):
                          output.textContent.includes('Budzet drugiego wariantu: blocking; Budzet przekroczony o 825 PLN.') &&
                          output.textContent.includes('825 PLN')
                      );
+                     first.value = 'second-config';
+                     second.value = 'first-config';
+                     button.click();
+                     const reversedRecommendation = await waitFor(() =>
+                         output.textContent.includes('Rekomendowany wariant: first-config')
+                     );
+                     first.value = 'first-config';
                      second.value = 'tie-config';
                      button.click();
                     const refreshedPair = await waitFor(() =>
@@ -1072,10 +1153,11 @@ class AppTest(unittest.TestCase):
                           !output.textContent.includes('pozostaje 1025 PLN') &&
                           output.textContent.includes('Budzet drugiego wariantu: ok; Budzet wystarcza; pozostaje 0 PLN.')
                       );
-                    const tie = await waitFor(() =>
-                        output.textContent.toLowerCase().includes('tie') ||
-                        output.textContent.toLowerCase().includes('remis')
-                    );
+                     const tie = await waitFor(() =>
+                         output.textContent.toLowerCase().includes('tie') ||
+                         output.textContent.toLowerCase().includes('remis')
+                     );
+                     const noRecommendation = !output.textContent.includes('Rekomendowany wariant:');
                     first.value = 'tie-config';
                     second.value = 'tie-config';
                     button.click();
@@ -1085,7 +1167,10 @@ class AppTest(unittest.TestCase):
                     );
                     return {
                         controls,
-                        firstPair,
+                         firstPair,
+                         firstRecommendation,
+                         reversedRecommendation,
+                         noRecommendation,
                         firstCompatibility,
                         firstBudget,
                         secondBudget,
@@ -1100,6 +1185,18 @@ class AppTest(unittest.TestCase):
 
         self.assertTrue(state['controls'], 'ekran udostepnia porownywarke')
         self.assertTrue(state['firstPair'], 'porownanie pokazuje oba koszty i tanszy wariant')
+        self.assertTrue(
+            state['firstRecommendation'],
+            'porownanie pokazuje rekomendowany identyfikator pierwszego wariantu',
+        )
+        self.assertTrue(
+            state['reversedRecommendation'],
+            'porownanie pokazuje rekomendowany identyfikator po odwroceniu wariantow',
+        )
+        self.assertTrue(
+            state['noRecommendation'],
+            'porownanie nie pokazuje rekomendacji przy jednakowych statusach',
+        )
         self.assertTrue(state['firstCompatibility'], 'porownanie pokazuje osobne oceny wariantow')
         self.assertTrue(state['firstBudget'], 'porownanie pokazuje pozostala kwote pierwszego wariantu')
         self.assertTrue(state['secondBudget'], 'porownanie pokazuje przekroczenie drugiego wariantu')

@@ -1,6 +1,6 @@
 # Backlog
 
-## US-014 — Osoba składająca PC wybiera wariant bez blokującego konfliktu  [nowa]
+## US-014 — Osoba składająca PC wybiera wariant bez blokującego konfliktu  [w toku]
 
 Jako osoba składająca PC chcę przy porównaniu zobaczyć wskazanie wariantu bez blokującego konfliktu, żeby nie wybrać zestawu, którego nie da się poprawnie złożyć.
 

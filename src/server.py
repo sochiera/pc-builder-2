@@ -165,6 +165,13 @@ def configuration_budget(configuration, cost):
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
+    first_compatibility = configuration_compatibility(first)
+    second_compatibility = configuration_compatibility(second)
+    recommended_configuration_id = None
+    if first_compatibility['level'] == 'blocking' and second_compatibility['level'] != 'blocking':
+        recommended_configuration_id = second_id
+    elif second_compatibility['level'] == 'blocking' and first_compatibility['level'] != 'blocking':
+        recommended_configuration_id = first_id
     return {
         'first_configuration_id': first_id,
         'second_configuration_id': second_id,
@@ -176,10 +183,11 @@ def compare_configuration_costs(first_id, first, second_id, second):
             'tie'
         ),
         'differences': configuration_differences(first, second),
-        'first_compatibility': configuration_compatibility(first),
-        'second_compatibility': configuration_compatibility(second),
+        'first_compatibility': first_compatibility,
+        'second_compatibility': second_compatibility,
         'first_budget': configuration_budget(first, first_cost),
         'second_budget': configuration_budget(second, second_cost),
+        'recommended_configuration_id': recommended_configuration_id,
     }
 
 
@@ -251,7 +259,10 @@ def _page_template():
       <script>document.addEventListener('click',async event=>{if(event.target!==openConfiguration)return;event.stopImmediatePropagation();const configurationIdValue=configurationIdInput.value.trim();if(!configurationIdValue){result.textContent='Podaj identyfikator konfiguracji.';result.dataset.level='blocking';return}const response=await fetch('/api/configurations/'+encodeURIComponent(configurationIdValue));const configuration=await response.json();if(response.ok===false){result.textContent=configuration.error||'Nie udalo sie otworzyc konfiguracji.';result.dataset.level='blocking';return}applyConfiguration(configuration);refresh()},{capture:true})</script>
         <script>const compareFirst=document.querySelector('#compare-first-id'),compareSecond=document.querySelector('#compare-second-id'),compareButton=document.querySelector('#compare-configurations'),comparisonResult=document.querySelector('#comparison-result');let compareGeneration=0;const comparisonFields={cpuId:['CPU',cpu],motherboardId:['plyta glowna',motherboard],ramId:['RAM',memory],psuId:['zasilacz',powerSupply],caseId:['obudowa',caseSelect]};const productName=(select,id)=>id===null?'Brak wyboru':select?.querySelector('option[value="'+id+'"]')?.textContent||id;const renderCompatibility=(label,compatibility)=>label+': '+compatibility.level+'; '+compatibility.message;const renderBudget=(label,budget)=>budget?label+': '+budget.level+'; '+budget.message:'';const renderComparison=comparison=>{const cheaper=comparison.cheaper==='tie'?'Remis':('Tanszy: '+comparison.cheaper);const compatibility=renderCompatibility('Pierwszy wariant',comparison.first_compatibility)+' | '+renderCompatibility('Drugi wariant',comparison.second_compatibility);const budgets=renderBudget('Budzet pierwszego wariantu',comparison.first_budget)+' | '+renderBudget('Budzet drugiego wariantu',comparison.second_budget);const differences=Object.entries(comparison.differences||{}).map(([field,parts])=>{const [category,select]=comparisonFields[field]||[field,null];const firstName=productName(select,parts.first_name===undefined?parts.first_id:parts.first_name);const secondName=productName(select,parts.second_name===undefined?parts.second_id:parts.second_name);const difference=parts.price_difference_pln>0?'+'+parts.price_difference_pln:parts.price_difference_pln;return category+': '+firstName+' ('+parts.first_price_pln+' PLN) vs '+secondName+' ('+parts.second_price_pln+' PLN); roznica: '+difference+' PLN'});return comparison.first_configuration_id+': '+comparison.first_cost_pln+' PLN; '+comparison.second_configuration_id+': '+comparison.second_cost_pln+' PLN; '+cheaper+' | '+compatibility+' | '+budgets+(differences.length?' | Roznice: '+differences.join('; '):'')};compareButton.addEventListener('click',async()=>{const generation=++compareGeneration;comparisonResult.textContent='';const firstId=compareFirst.value.trim(),secondId=compareSecond.value.trim();if(!firstId||!secondId||firstId===secondId){comparisonResult.textContent='Do porownania potrzebne sa dwa rozne dostepne zapisy.';return}try{const params=new URLSearchParams({firstId,secondId});const response=await fetch('/api/compare?'+params);const comparison=await response.json();if(generation!==compareGeneration)return;if(response.ok===false){comparisonResult.textContent=comparison.error||'Nie udalo sie porownac zapisow.';return}comparisonResult.textContent=renderComparison(comparison)}catch(error){if(generation===compareGeneration)comparisonResult.textContent='Nie udalo sie porownac zapisow.'}});</script>
          </main></body></html>'''
-    return html
+    return html.replace(
+        "return comparison.first_configuration_id",
+        "return (comparison.recommended_configuration_id === null || comparison.recommended_configuration_id === undefined ? '' : 'Rekomendowany wariant: ' + comparison.recommended_configuration_id + ' | ') + comparison.first_configuration_id",
+    )
 
 
 def page(configuration=None, error=None):
