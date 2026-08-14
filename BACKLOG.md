@@ -1,5 +1,13 @@
 # Backlog
 
+## US-017 — Osoba składająca PC rozpoznaje nazwane warianty w porównaniu  [nowa]
+
+Jako osoba składająca PC chcę nadać nazwy zapisanym zestawom i widzieć je podczas porównania, żeby łatwo rozpoznać warianty oraz rekomendowany wybór.
+
+- Dlaczego teraz: PROJECT.md wymaga porównywania zapisanych konfiguracji jako wariantów i czytelnego podsumowania rekomendacji, a dostarczone US-014–US-016 wskazują wybór za pomocą identyfikatora zamiast nazwy zrozumiałej dla osoby porównującej.
+- Sprawdzenie: uruchom demo, zapisz dwa zestawy pod różnymi nazwami, porównaj je i potwierdź, że ekran pokazuje obie nazwy oraz używa właściwej nazwy przy rekomendowanym wariancie także po ponownym otwarciu aplikacji.
+- Poza zakresem: zmiana nazwy po zapisaniu, lista zapisów, opisy i tagi, konta użytkowników oraz porównanie więcej niż dwóch zestawów.
+
 ## US-016 — Osoba składająca PC wybiera tańszy z równie bezpiecznych wariantów  [do weryfikacji]
 
 Jako osoba składająca PC chcę przy porównaniu równie bezpiecznych zestawów zobaczyć wskazanie tańszego wariantu, żeby ograniczyć koszt bez rezygnacji ze zgodności ani budżetu.
