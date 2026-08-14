@@ -39,3 +39,11 @@ Jako osoba składająca PC chcę widzieć łączny koszt wybranych części, że
 - Dlaczego teraz: PROJECT.md wskazuje koszty jako kolejny prawdopodobny etap po regułach RAM, PSU i fizycznego montażu oraz wymaga, aby koszt był widoczny bez szukania.
 - Sprawdzenie: uruchom demo, wybierz kolejno kilka nazwanych części i potwierdź po każdym wyborze, że widoczny łączny koszt odpowiada aktualnemu zestawowi.
 - Poza zakresem: budżet, historia i porównanie cen, oferty wielu sklepów, dostawa, rabaty oraz optymalizacja koszyka.
+
+## US-006 — Osoba składająca PC sprawdza, czy zestaw mieści się w budżecie  [nowa]
+
+Jako osoba składająca PC chcę podać swój budżet i zobaczyć, czy koszt wybranych części go przekracza, żeby kontrolować wydatki podczas kompletowania zestawu.
+
+- Dlaczego teraz: PROJECT.md wskazuje budżet jako kolejny etap wraz z kosztami, a obecna historyjka kosztowa pokazuje kwotę bez odniesienia jej do limitu użytkownika.
+- Sprawdzenie: uruchom demo, ustaw budżet kolejno powyżej i poniżej kosztu aktualnego zestawu i potwierdź, że widoczna ocena rozróżnia oba przypadki oraz pokazuje pozostałą kwotę lub przekroczenie.
+- Poza zakresem: rekomendowanie zamienników, blokowanie wyboru części, wiele budżetów, zapis konfiguracji, import i historia cen oraz oferty sklepów.
