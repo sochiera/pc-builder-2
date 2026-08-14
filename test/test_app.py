@@ -2,8 +2,10 @@ import json
 import base64
 from html.parser import HTMLParser
 import os
+from pathlib import Path
 import socket
 import subprocess
+from tempfile import TemporaryDirectory
 from threading import Thread
 import time
 import unittest
@@ -12,6 +14,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from src import catalog
+from src import server
 from src.catalog import CPUS, MEMORY, MOTHERBOARDS, POWER_SUPPLIES
 from src.server import create_app
 
@@ -133,7 +136,13 @@ class AppTest(unittest.TestCase):
             with urlopen(f'{self.base_url}{path}') as response:
                 return response.status, json.loads(response.read())
         except HTTPError as error:
-            return error.code, {}
+            try:
+                body = json.loads(error.read())
+            except json.JSONDecodeError:
+                body = {}
+            finally:
+                error.close()
+            return error.code, body
 
     def post_json(self, path, payload):
         request = Request(
@@ -186,19 +195,68 @@ class AppTest(unittest.TestCase):
         self.assertEqual(saved.get('parts'), {'cpuId': 'core-i5-14600k'})
         self.assertNotIn('budgetPln', saved)
 
+    def test_configuration_can_be_opened_after_save_and_app_restart(self):
+        payload = {
+            'cpuId': 'ryzen-7-7800x3d',
+            'motherboardId': 'msi-b650',
+            'ramId': 'corsair-vengeance-ddr5',
+            'psuId': 'corsair-rm750x',
+            'caseId': 'atx-mid-tower',
+            'budgetPln': 5000,
+        }
+
+        status, saved = self.post_json('/api/configurations', payload)
+        self.assertEqual(status, 201)
+
+        status, opened = self.get_json(
+            f"/api/configurations/{saved['configuration_id']}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(opened['configuration_id'], saved['configuration_id'])
+        self.assertEqual(
+            opened['parts'],
+            {key: value for key, value in payload.items() if key != 'budgetPln'},
+        )
+        self.assertEqual(opened['budgetPln'], payload['budgetPln'])
+        self.assertEqual(opened, saved)
+
+        restarted_app = create_app(port=0)
+        restarted_thread = Thread(target=restarted_app.serve_forever)
+        restarted_thread.start()
+        try:
+            restarted_url = f'http://127.0.0.1:{restarted_app.server_port}'
+            with urlopen(
+                f"{restarted_url}/api/configurations/{saved['configuration_id']}"
+            ) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(json.loads(response.read()), saved)
+        finally:
+            restarted_app.shutdown()
+            restarted_thread.join()
+            restarted_app.server_close()
+
+        status, missing = self.get_json('/api/configurations/does-not-exist')
+        self.assertEqual(status, 404)
+        self.assertEqual(missing, {'error': 'Nie znaleziono konfiguracji.'})
+
     def test_configuration_save_rejects_invalid_parts_and_budget_without_creating_one(self):
         invalid_payloads = (
             ({'cpuId': 'msi-b650'}, 'cpuId'),
             ({'budgetPln': -1}, 'Budzet'),
         )
 
-        for payload, expected_error in invalid_payloads:
-            with self.subTest(payload=payload):
-                status, response = self.post_json('/api/configurations', payload)
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text('{}', encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                for payload, expected_error in invalid_payloads:
+                    with self.subTest(payload=payload):
+                        before = store.read_bytes()
+                        status, response = self.post_json('/api/configurations', payload)
 
-                self.assertEqual(status, 400)
-                self.assertIn(expected_error, response.get('error', ''))
-                self.assertFalse(self.app.configurations)
+                        self.assertEqual(status, 400)
+                        self.assertIn(expected_error, response.get('error', ''))
+                        self.assertEqual(store.read_bytes(), before)
 
     def test_catalog_exposes_named_products_with_stable_identifiers(self):
         with urlopen(self.base_url) as response:

@@ -2,8 +2,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
 import json
 import os
+from pathlib import Path
+from threading import Lock
 from uuid import uuid4
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from src.analyze_build import analyze_build
 from src.analyze_build import combine_analyses
@@ -26,6 +28,30 @@ CONFIGURATION_CATALOGS = {
     'psuId': POWER_SUPPLIES,
     'caseId': CASES,
 }
+
+CONFIGURATION_STORE = Path(
+    os.environ.get('PC_BUILDER_CONFIGURATIONS_FILE', '/tmp/pc-builder-configurations.json')
+)
+CONFIGURATION_STORE_LOCK = Lock()
+
+
+def load_configurations():
+    try:
+        with CONFIGURATION_STORE.open(encoding='utf-8') as store:
+            configurations = json.load(store)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return configurations if isinstance(configurations, dict) else {}
+
+
+def save_configuration(configuration_id, configuration):
+    with CONFIGURATION_STORE_LOCK:
+        configurations = load_configurations()
+        configurations[configuration_id] = configuration
+        temporary_store = CONFIGURATION_STORE.with_suffix('.tmp')
+        with temporary_store.open('w', encoding='utf-8') as store:
+            json.dump(configurations, store)
+        temporary_store.replace(CONFIGURATION_STORE)
 
 
 def render_options(products):
@@ -119,10 +145,22 @@ class AppHandler(BaseHTTPRequestHandler):
         if 'budgetPln' in payload:
             saved['budgetPln'] = budget
         self.server.configurations[configuration_id] = saved
+        save_configuration(configuration_id, saved)
         self.respond(201, 'application/json; charset=utf-8', json.dumps(saved))
 
     def do_GET(self):
         request = urlparse(self.path)
+        configuration_prefix = '/api/configurations/'
+        if request.path.startswith(configuration_prefix):
+            configuration_id = unquote(request.path[len(configuration_prefix):])
+            saved = load_configurations().get(configuration_id)
+            if saved is None:
+                self.respond(404, 'application/json; charset=utf-8', json.dumps({
+                    'error': 'Nie znaleziono konfiguracji.',
+                }))
+                return
+            self.respond(200, 'application/json; charset=utf-8', json.dumps(saved))
+            return
         if request.path == '/api/analyze':
             query = parse_qs(request.query, keep_blank_values=True)
             value = lambda name: query.get(name, [''])[0]
