@@ -928,14 +928,22 @@ class AppTest(unittest.TestCase):
                             first_cost_pln: 3975,
                             second_cost_pln: 3250,
                             cheaper: 'second',
-                            first_compatibility: {
-                                level: 'ok',
-                                message: 'Pierwszy zestaw jest zgodny.',
-                            },
-                            second_compatibility: {
-                                level: 'blocking',
-                                message: 'Drugi zestaw ma konflikt socketu.',
-                            },
+                             first_compatibility: {
+                                 level: 'ok',
+                                 message: 'Pierwszy zestaw jest zgodny.',
+                             },
+                             first_budget: {
+                                 level: 'ok',
+                                 message: 'Budzet wystarcza; pozostaje 1025 PLN.',
+                             },
+                             second_compatibility: {
+                                 level: 'blocking',
+                                 message: 'Drugi zestaw ma konflikt socketu.',
+                             },
+                             second_budget: {
+                                 level: 'blocking',
+                                 message: 'Budzet przekroczony o 825 PLN.',
+                             },
                             differences: {
                                 cpuId: {
                                     first_id: 'ryzen-7-7800x3d',
@@ -952,14 +960,22 @@ class AppTest(unittest.TestCase):
                             first_cost_pln: 3975,
                             second_cost_pln: 3975,
                             cheaper: 'tie',
-                            first_compatibility: {
-                                level: 'blocking',
-                                message: 'Pierwszy remisowy zestaw ma konflikt.',
-                            },
-                            second_compatibility: {
-                                level: 'ok',
-                                message: 'Drugi remisowy zestaw jest zgodny.',
-                            },
+                             first_compatibility: {
+                                 level: 'blocking',
+                                 message: 'Pierwszy remisowy zestaw ma konflikt.',
+                             },
+                             first_budget: {
+                                 level: 'info',
+                                 message: 'Dla pierwszego wariantu nie ustawiono budzetu.',
+                             },
+                             second_compatibility: {
+                                 level: 'ok',
+                                 message: 'Drugi remisowy zestaw jest zgodny.',
+                             },
+                             second_budget: {
+                                 level: 'ok',
+                                 message: 'Budzet wystarcza; pozostaje 0 PLN.',
+                             },
                             differences: {
                                 motherboardId: {
                                     first_id: 'msi-b650',
@@ -1012,14 +1028,21 @@ class AppTest(unittest.TestCase):
                         output.textContent.includes('1249 PLN') &&
                         output.textContent.includes('+350 PLN')
                     );
-                    const firstCompatibility = await waitFor(() =>
-                        output.textContent.includes('Pierwszy wariant: ok') &&
-                        output.textContent.includes('Drugi wariant: blocking') &&
-                        output.textContent.includes('Pierwszy zestaw jest zgodny.') &&
-                        output.textContent.includes('Drugi zestaw ma konflikt socketu.')
-                    );
-                    second.value = 'tie-config';
-                    button.click();
+                     const firstCompatibility = await waitFor(() =>
+                         output.textContent.includes('Pierwszy wariant: ok') &&
+                         output.textContent.includes('Drugi wariant: blocking') &&
+                         output.textContent.includes('Pierwszy zestaw jest zgodny.') &&
+                         output.textContent.includes('Drugi zestaw ma konflikt socketu.')
+                     );
+                     const firstBudget = await waitFor(() =>
+                         output.textContent.includes('Budzet pierwszego wariantu: ok; Budzet wystarcza; pozostaje 1025 PLN.')
+                     );
+                     const secondBudget = await waitFor(() =>
+                         output.textContent.includes('Budzet drugiego wariantu: blocking; Budzet przekroczony o 825 PLN.') &&
+                         output.textContent.includes('825 PLN')
+                     );
+                     second.value = 'tie-config';
+                     button.click();
                     const refreshedPair = await waitFor(() =>
                         output.textContent.includes('3975 PLN') &&
                         !output.textContent.includes('3250 PLN') &&
@@ -1034,14 +1057,21 @@ class AppTest(unittest.TestCase):
                         !output.textContent.includes('AMD Ryzen 7 7800X3D') &&
                         !output.textContent.includes('Intel Core i5-14600K')
                     );
-                    const refreshedCompatibility = await waitFor(() =>
-                        output.textContent.includes('Pierwszy wariant: blocking') &&
+                     const refreshedCompatibility = await waitFor(() =>
+                         output.textContent.includes('Pierwszy wariant: blocking') &&
                         output.textContent.includes('Drugi wariant: ok') &&
                         output.textContent.includes('Pierwszy remisowy zestaw ma konflikt.') &&
                         output.textContent.includes('Drugi remisowy zestaw jest zgodny.') &&
                         !output.textContent.includes('Pierwszy zestaw jest zgodny.') &&
-                        !output.textContent.includes('Drugi zestaw ma konflikt socketu.')
-                    );
+                         !output.textContent.includes('Drugi zestaw ma konflikt socketu.')
+                     );
+                      const refreshedBudget = await waitFor(() =>
+                          output.textContent.includes('Budzet pierwszego wariantu: info; Dla pierwszego wariantu nie ustawiono budzetu.') &&
+                          !output.textContent.includes('Budzet pierwszego wariantu: info; Dla pierwszego wariantu nie ustawiono budzetu. pozostaje') &&
+                          !output.textContent.includes('Budzet pierwszego wariantu: info; Dla pierwszego wariantu nie ustawiono budzetu. przekrocz') &&
+                          !output.textContent.includes('pozostaje 1025 PLN') &&
+                          output.textContent.includes('Budzet drugiego wariantu: ok; Budzet wystarcza; pozostaje 0 PLN.')
+                      );
                     const tie = await waitFor(() =>
                         output.textContent.toLowerCase().includes('tie') ||
                         output.textContent.toLowerCase().includes('remis')
@@ -1057,8 +1087,11 @@ class AppTest(unittest.TestCase):
                         controls,
                         firstPair,
                         firstCompatibility,
+                        firstBudget,
+                        secondBudget,
                         refreshedPair,
                         refreshedCompatibility,
+                        refreshedBudget,
                         tie,
                         unavailablePair,
                     };
@@ -1068,8 +1101,11 @@ class AppTest(unittest.TestCase):
         self.assertTrue(state['controls'], 'ekran udostepnia porownywarke')
         self.assertTrue(state['firstPair'], 'porownanie pokazuje oba koszty i tanszy wariant')
         self.assertTrue(state['firstCompatibility'], 'porownanie pokazuje osobne oceny wariantow')
+        self.assertTrue(state['firstBudget'], 'porownanie pokazuje pozostala kwote pierwszego wariantu')
+        self.assertTrue(state['secondBudget'], 'porownanie pokazuje przekroczenie drugiego wariantu')
         self.assertTrue(state['refreshedPair'], 'zmiana zapisu usuwa koszt poprzedniej pary')
         self.assertTrue(state['refreshedCompatibility'], 'zmiana zapisu zastepuje oceny wariantow')
+        self.assertTrue(state['refreshedBudget'], 'porownanie bez budzetu pokazuje brak limitu wariantu')
         self.assertTrue(state['tie'], 'porownanie rownych kosztow pokazuje remis')
         self.assertTrue(state['unavailablePair'], 'nieudane porownanie czysci stary wynik i wyjasnia wymagane zapisy')
 
