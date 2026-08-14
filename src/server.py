@@ -102,6 +102,56 @@ def configuration_part_price(field, product_id):
     return product['price_pln'] if product is not None else 0
 
 
+def analyze_configuration(parts):
+    cpu_id = parts.get('cpuId', '')
+    motherboard_id = parts.get('motherboardId', '')
+    ram_id = parts.get('ramId', '')
+    psu_id = parts.get('psuId', '')
+    case_id = parts.get('caseId', '')
+
+    if 'psuId' in parts or all(
+        field in parts for field in ('cpuId', 'motherboardId', 'ramId')
+    ):
+        analyses = [
+            analyze_products(cpu_id, motherboard_id, CPUS, MOTHERBOARDS),
+            analyze_memory(motherboard_id, ram_id, MOTHERBOARDS, MEMORY),
+            analyze_power_supply(
+                cpu_id,
+                motherboard_id,
+                ram_id,
+                psu_id,
+                CPUS,
+                MOTHERBOARDS,
+                MEMORY,
+                POWER_SUPPLIES,
+            ),
+        ]
+        if 'caseId' in parts:
+            analyses.append(analyze_selected_case(motherboard_id, case_id))
+    elif 'caseId' in parts:
+        analyses = [analyze_selected_case(motherboard_id, case_id)]
+        if 'ramId' in parts:
+            analyses.append(
+                analyze_memory(motherboard_id, ram_id, MOTHERBOARDS, MEMORY)
+            )
+        if 'cpuId' in parts:
+            analyses.append(
+                analyze_products(cpu_id, motherboard_id, CPUS, MOTHERBOARDS)
+            )
+    elif 'ramId' in parts or ('motherboardId' in parts and 'cpuId' not in parts):
+        analyses = [analyze_memory(motherboard_id, ram_id, MOTHERBOARDS, MEMORY)]
+    elif 'cpuId' in parts or 'motherboardId' in parts:
+        analyses = [analyze_products(cpu_id, motherboard_id, CPUS, MOTHERBOARDS)]
+    else:
+        analyses = [analyze_build('', '')]
+
+    return combine_analyses(*analyses)
+
+
+def configuration_compatibility(configuration):
+    return analyze_configuration(configuration.get('parts', {}))
+
+
 def compare_configuration_costs(first_id, first, second_id, second):
     first_cost = configuration_cost(first)
     second_cost = configuration_cost(second)
@@ -116,6 +166,8 @@ def compare_configuration_costs(first_id, first, second_id, second):
             'tie'
         ),
         'differences': configuration_differences(first, second),
+        'first_compatibility': configuration_compatibility(first),
+        'second_compatibility': configuration_compatibility(second),
     }
 
 
@@ -331,83 +383,13 @@ class AppHandler(BaseHTTPRequestHandler):
         if request.path == '/api/analyze':
             query = parse_qs(request.query, keep_blank_values=True)
             value = lambda name: query.get(name, [''])[0]
-            has_all_part_keys = all(
-                name in query for name in ('cpuId', 'motherboardId', 'ramId')
-            )
-            if (
-                'psuId' in query
-                or has_all_part_keys
-            ):
-                cpu_id = value('cpuId')
-                motherboard_id = value('motherboardId')
-                ram_id = value('ramId')
-                psu_id = value('psuId')
-                case_id = value('caseId')
-                socket_result = analyze_products(
-                    cpu_id,
-                    motherboard_id,
-                    CPUS,
-                    MOTHERBOARDS,
-                )
-                memory_result = analyze_memory(
-                    motherboard_id,
-                    ram_id,
-                    MOTHERBOARDS,
-                    MEMORY,
-                )
-                analyses = [
-                    socket_result,
-                    memory_result,
-                    analyze_power_supply(
-                        cpu_id,
-                        motherboard_id,
-                        ram_id,
-                        psu_id,
-                        CPUS,
-                        MOTHERBOARDS,
-                        MEMORY,
-                        POWER_SUPPLIES,
-                    ),
-                ]
-                if 'caseId' in query:
-                    analyses.append(analyze_selected_case(motherboard_id, case_id))
-                result = combine_analyses(*analyses)
-            elif 'caseId' in query:
-                motherboard_id = value('motherboardId')
-                analyses = [analyze_selected_case(motherboard_id, value('caseId'))]
-                if 'ramId' in query:
-                    analyses.append(
-                        analyze_memory(
-                            motherboard_id,
-                            value('ramId'),
-                            MOTHERBOARDS,
-                            MEMORY,
-                        )
-                    )
-                if 'cpuId' in query:
-                    analyses.append(
-                        analyze_products(
-                            value('cpuId'),
-                            motherboard_id,
-                            CPUS,
-                            MOTHERBOARDS,
-                        )
-                    )
-                result = combine_analyses(*analyses)
-            elif 'ramId' in query or ('motherboardId' in query and 'cpuId' not in query):
-                result = analyze_memory(
-                    value('motherboardId'),
-                    value('ramId'),
-                    MOTHERBOARDS,
-                    MEMORY,
-                )
-            elif 'cpuId' in query or 'motherboardId' in query:
-                result = analyze_products(
-                    value('cpuId'),
-                    value('motherboardId'),
-                    CPUS,
-                    MOTHERBOARDS,
-                )
+            parts = {
+                field: value(field)
+                for field in CONFIGURATION_CATALOGS
+                if field in query
+            }
+            if parts:
+                result = analyze_configuration(parts)
             else:
                 result = analyze_build(
                     value('cpuSocket'),

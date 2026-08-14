@@ -342,6 +342,48 @@ class AppTest(unittest.TestCase):
 
             self.assertEqual(json.loads(store.read_text(encoding='utf-8')), configurations)
 
+    def test_compare_configurations_reports_compatibility_for_each_variant(self):
+        configurations = {
+            'compatible-config': {
+                'configuration_id': 'compatible-config',
+                'budgetPln': 1,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'conflicting-config': {
+                'configuration_id': 'conflicting-config',
+                'budgetPln': 99999,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                status, comparison = self.get_json(
+                    '/api/compare?firstId=compatible-config&secondId=conflicting-config'
+                )
+
+        self.assertEqual(status, 200)
+        self.assertIn('first_compatibility', comparison)
+        self.assertIn('second_compatibility', comparison)
+        self.assertEqual(comparison['first_compatibility']['level'], 'ok')
+        self.assertIn('zgodny', comparison['first_compatibility']['message'])
+        self.assertEqual(comparison['second_compatibility']['level'], 'blocking')
+        self.assertIn('socket', comparison['second_compatibility']['message'])
+
     def test_compare_configurations_reports_only_different_selected_parts(self):
         configurations = {
             'first-config': {

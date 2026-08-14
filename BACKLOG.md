@@ -88,7 +88,7 @@ Jako osoba składająca PC chcę przy każdej różniącej się części zobaczy
 - Sprawdzenie: uruchom demo, zapisz dwa zestawy różniące się częścią, porównaj je i potwierdź, że przy tej części widać ceny obu wyborów oraz ich różnicę w PLN.
 - Poza zakresem: historia i źródła cen, dostawa, rekomendowanie wariantu, porównanie wydajności i zgodności oraz porównanie więcej niż dwóch zestawów.
 
-## US-012 — Osoba składająca PC porównuje zgodność dwóch zapisanych zestawów  [nowa]
+## US-012 — Osoba składająca PC porównuje zgodność dwóch zapisanych zestawów  [w toku]
 
 Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zobaczyć zgodność każdego z nich, żeby nie wybrać tańszego wariantu z blokującym problemem.
 
