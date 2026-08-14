@@ -402,6 +402,218 @@ class AppTest(unittest.TestCase):
 
             self.assertEqual(json.loads(store.read_text(encoding='utf-8')), configurations)
 
+    def test_compare_configurations_returns_named_variants_and_maps_recommendations(self):
+        configurations = {
+            'workstation': {
+                'configuration_id': 'workstation',
+                'name': 'Stacja robocza',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'gaming': {
+                'configuration_id': 'gaming',
+                'name': 'Zestaw gamingowy',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'over-budget': {
+                'configuration_id': 'over-budget',
+                'name': 'Wariant ponad budzetem',
+                'budgetPln': 1,
+                'parts': {
+                    'cpuId': 'core-i5-14600k',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'incompatible': {
+                'configuration_id': 'incompatible',
+                'name': 'Wariant niezgodny',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'asus-z790',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+            'legacy': {
+                'configuration_id': 'legacy',
+                'budgetPln': 5000,
+                'parts': {
+                    'cpuId': 'ryzen-7-7800x3d',
+                    'motherboardId': 'msi-b650',
+                    'ramId': 'corsair-vengeance-ddr5',
+                    'psuId': 'corsair-rm750x',
+                    'caseId': 'atx-mid-tower',
+                },
+            },
+        }
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / 'configurations.json'
+            store.write_text(json.dumps(configurations), encoding='utf-8')
+            with patch.object(server, 'CONFIGURATION_STORE', store):
+                for first_id, second_id, expected_recommendations in (
+                    (
+                        'workstation',
+                        'gaming',
+                        {
+                            'recommended_configuration_id': None,
+                            'budget_recommended_configuration_id': None,
+                            'cost_recommended_configuration_id': 'gaming',
+                        },
+                    ),
+                    (
+                        'gaming',
+                        'workstation',
+                        {
+                            'recommended_configuration_id': None,
+                            'budget_recommended_configuration_id': None,
+                            'cost_recommended_configuration_id': 'gaming',
+                        },
+                    ),
+                ):
+                    with self.subTest(first_id=first_id, second_id=second_id):
+                        status, comparison = self.get_json(
+                            f'/api/compare?firstId={first_id}&secondId={second_id}'
+                        )
+                        self.assertEqual(status, 200)
+                        self.assertIn('first_configuration_name', comparison)
+                        self.assertIn('second_configuration_name', comparison)
+                        self.assertEqual(
+                            comparison['first_configuration_name'],
+                            configurations[first_id]['name'],
+                        )
+                        self.assertEqual(
+                            comparison['second_configuration_name'],
+                            configurations[second_id]['name'],
+                        )
+                        names_by_id = {
+                            comparison['first_configuration_id']:
+                                comparison['first_configuration_name'],
+                            comparison['second_configuration_id']:
+                                comparison['second_configuration_name'],
+                        }
+                        for recommendation_type in (
+                            'recommended_configuration_id',
+                            'budget_recommended_configuration_id',
+                            'cost_recommended_configuration_id',
+                        ):
+                            recommendation_id = comparison[recommendation_type]
+                            self.assertEqual(
+                                recommendation_id,
+                                expected_recommendations[recommendation_type],
+                            )
+                            if recommendation_id is not None:
+                                self.assertEqual(
+                                    names_by_id[recommendation_id],
+                                    configurations[recommendation_id]['name'],
+                                )
+
+                for first_id, second_id in (
+                    ('workstation', 'legacy'),
+                    ('legacy', 'workstation'),
+                ):
+                    with self.subTest(first_id=first_id, second_id=second_id):
+                        status, comparison = self.get_json(
+                            f'/api/compare?firstId={first_id}&secondId={second_id}'
+                        )
+                        self.assertEqual(status, 200)
+                        self.assertEqual(
+                            comparison['first_configuration_name'],
+                            configurations[first_id].get('name'),
+                        )
+                        self.assertEqual(
+                            comparison['second_configuration_name'],
+                            configurations[second_id].get('name'),
+                        )
+                        self.assertEqual(
+                            comparison['first_configuration_id'], first_id
+                        )
+                        self.assertEqual(
+                            comparison['second_configuration_id'], second_id
+                        )
+                        self.assertEqual(comparison['differences'], {})
+                        self.assertEqual(comparison['cheaper'], 'tie')
+                        self.assertEqual(
+                            comparison['first_compatibility']['level'], 'ok'
+                        )
+                        self.assertEqual(
+                            comparison['second_compatibility']['level'], 'ok'
+                        )
+                        self.assertEqual(comparison['first_budget']['level'], 'ok')
+                        self.assertEqual(comparison['second_budget']['level'], 'ok')
+                        self.assertIsNone(comparison['recommended_configuration_id'])
+                        self.assertIsNone(
+                            comparison['budget_recommended_configuration_id']
+                        )
+                        self.assertIsNone(comparison['cost_recommended_configuration_id'])
+
+                for first_id, second_id, expected_recommendations in (
+                    (
+                        'workstation',
+                        'incompatible',
+                        {
+                            'recommended_configuration_id': 'workstation',
+                            'budget_recommended_configuration_id': None,
+                            'cost_recommended_configuration_id': None,
+                        },
+                    ),
+                    (
+                        'workstation',
+                        'over-budget',
+                        {
+                            'recommended_configuration_id': None,
+                            'budget_recommended_configuration_id': 'workstation',
+                            'cost_recommended_configuration_id': None,
+                        },
+                    ),
+                ):
+                    with self.subTest(first_id=first_id, second_id=second_id):
+                        status, comparison = self.get_json(
+                            f'/api/compare?firstId={first_id}&secondId={second_id}'
+                        )
+                        self.assertEqual(status, 200)
+                        self.assertIn('first_configuration_name', comparison)
+                        self.assertIn('second_configuration_name', comparison)
+                        names_by_id = {
+                            comparison['first_configuration_id']:
+                                comparison['first_configuration_name'],
+                            comparison['second_configuration_id']:
+                                comparison['second_configuration_name'],
+                        }
+                        for recommendation_type in (
+                            'recommended_configuration_id',
+                            'budget_recommended_configuration_id',
+                            'cost_recommended_configuration_id',
+                        ):
+                            recommendation_id = comparison[recommendation_type]
+                            self.assertEqual(
+                                recommendation_id,
+                                expected_recommendations[recommendation_type],
+                            )
+                            if recommendation_id is not None:
+                                self.assertEqual(
+                                    names_by_id[recommendation_id],
+                                    configurations[recommendation_id]['name'],
+                                )
+
     def test_compare_configurations_recommends_cheaper_equally_safe_variant(self):
         configurations = {
             'expensive-safe': {

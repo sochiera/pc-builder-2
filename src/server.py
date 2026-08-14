@@ -76,6 +76,10 @@ def configuration_cost(configuration):
     )
 
 
+def configuration_name(configuration):
+    return configuration.get('name')
+
+
 def configuration_differences(first, second):
     first_parts = first.get('parts', {})
     second_parts = second.get('parts', {})
@@ -249,6 +253,8 @@ def compare_configuration_costs(first_id, first, second_id, second):
     return {
         'first_configuration_id': first_id,
         'second_configuration_id': second_id,
+        'first_configuration_name': configuration_name(first),
+        'second_configuration_name': configuration_name(second),
         'first_cost_pln': first_cost,
         'second_cost_pln': second_cost,
         'cheaper': (
