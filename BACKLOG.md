@@ -95,3 +95,11 @@ Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zo
 - Dlaczego teraz: PROJECT.md wymaga porównywania konfiguracji jako wariantów oraz wiarygodnego podsumowania zgodności, a raport task-034 potwierdził domknięcie wyjaśnienia różnic kosztowych bez oceny zgodności wariantów.
 - Sprawdzenie: uruchom demo, zapisz jeden zgodny zestaw i jeden zestaw z blokującym konfliktem, porównaj je i potwierdź, że ekran odrębnie pokazuje zgodność obu wariantów oraz wskazuje problematyczny zestaw.
 - Poza zakresem: rekomendowanie lepszego wariantu, porównanie wydajności, ostrzeżenia nieblokujące, naprawianie konfliktów i porównanie więcej niż dwóch zestawów.
+
+## US-013 — Osoba składająca PC porównuje zestawy względem ich budżetów  [nowa]
+
+Jako osoba składająca PC chcę przy porównaniu dwóch zapisanych zestawów zobaczyć, czy każdy z nich mieści się we własnym budżecie, żeby koszt tańszego wariantu nie przesłonił mojego limitu wydatków.
+
+- Dlaczego teraz: PROJECT.md wymaga uwzględnienia budżetu w ocenie zestawu, a raport task-036 potwierdził widoczną zgodność obu wariantów bez pokazania ich oceny budżetowej.
+- Sprawdzenie: uruchom demo, zapisz dwa zestawy z budżetami ustawionymi odpowiednio powyżej i poniżej ich kosztów, porównaj je i potwierdź, że ekran osobno pokazuje pozostałą kwotę oraz przekroczenie budżetu.
+- Poza zakresem: rekomendowanie wariantu lub zamienników, wspólny budżet dla obu zestawów, edycja zapisów, historia cen i porównanie więcej niż dwóch zestawów.
