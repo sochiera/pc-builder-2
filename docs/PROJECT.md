@@ -28,7 +28,9 @@ Docelowo konfigurator pozwala zbudowac, zapisac, udostepnic i porownac zestawy, 
 
 ## Co stoi
 
-Minimalna aplikacja Python wyswietla wybor CPU i plyty oraz automatycznie wywoluje API analizy socketu. Zgodny socket daje status poprawny, rozny socket blokuje konfiguracje. Jeden test uruchamia ten sam serwer i sprawdza ekran oraz odpowiedz API.
+Aplikacja pozwala wybrac CPU, plyte glowna, RAM, zasilacz i obudowe oraz pokazuje zgodnosc socketu, pamieci, mocy i formatu montazowego. Pokazuje tez laczny koszt zestawu i ocene wzgledem podanego budzetu. Te przyrosty czekaja na weryfikacje, a najblizsza nowa praca dotyczy zachowania i ponownego otwarcia jednego zestawu.
+
+Backlog wyjatkowo ma siedem aktywnych historyjek, poniewaz szesc dostarczonych przyrostow czeka na weryfikacje, a tylko jedna historyjka jest nowa. Nie poszerzamy kolejki o kolejny przyrost do czasu zwolnienia miejsca przez weryfikacje.
 
 ## Kolejne prawdopodobne etapy
 
