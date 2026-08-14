@@ -31,3 +31,11 @@ Jako osoba składająca PC chcę dobrać obudowę do wybranej płyty głównej, 
 - Dlaczego teraz: PROJECT.md wskazuje fizyczny montaż obok reguł RAM i PSU jako prawdopodobny etap, a po objęciu RAM i zasilania jest to jedyny z tych trzech obszarów niepokryty historyjką.
 - Sprawdzenie: uruchom demo, wybierz płytę główną oraz kolejno pasującą i niepasującą obudowę, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
 - Poza zakresem: dopasowanie karty graficznej, chłodzenia i zasilacza, przepływ powietrza, złącza panelu obudowy, ceny oraz pozostałe zależności montażowe.
+
+## US-005 — Osoba składająca PC widzi łączny koszt wybranych części  [nowa]
+
+Jako osoba składająca PC chcę widzieć łączny koszt wybranych części, żeby od razu ocenić, ile kosztuje mój aktualny zestaw.
+
+- Dlaczego teraz: PROJECT.md wskazuje koszty jako kolejny prawdopodobny etap po regułach RAM, PSU i fizycznego montażu oraz wymaga, aby koszt był widoczny bez szukania.
+- Sprawdzenie: uruchom demo, wybierz kolejno kilka nazwanych części i potwierdź po każdym wyborze, że widoczny łączny koszt odpowiada aktualnemu zestawowi.
+- Poza zakresem: budżet, historia i porównanie cen, oferty wielu sklepów, dostawa, rabaty oraz optymalizacja koszyka.
