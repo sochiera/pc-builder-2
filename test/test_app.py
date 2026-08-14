@@ -353,6 +353,48 @@ class AppTest(unittest.TestCase):
             self.assertIn('LGA1700', analysis['message'])
             self.assertIn('Plyta w formacie ATX pasuje do obudowy', analysis['message'])
 
+    def test_partial_analysis_keeps_blocking_results_with_missing_or_empty_choices(self):
+        with self.subTest('empty power supply preserves RAM mismatch and case result'):
+            status, analysis = self.get_json(
+                '/api/analyze?motherboardId=msi-b650'
+                '&ramId=kingston-fury-ddr4&psuId=&caseId=atx-mid-tower'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('Pamiec RAM DDR4 jest niezgodna', analysis['message'])
+            self.assertIn('zasilacz', analysis['message'].lower())
+            self.assertIn('Plyta w formacie ATX pasuje do obudowy', analysis['message'])
+
+        with self.subTest('missing RAM preserves case mismatch and missing RAM result'):
+            status, analysis = self.get_json(
+                '/api/analyze?motherboardId=asus-z790&ramId='
+                '&caseId=mini-itx-compact'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('Plyta w formacie ATX nie pasuje do obudowy', analysis['message'])
+            self.assertIn('pamiec RAM', analysis['message'])
+
+        with self.subTest('empty RAM preserves socket and case mismatches with PSU selected'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+                '&ramId=&psuId=corsair-rm750x&caseId=mini-itx-compact'
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('socketu AM5', analysis['message'])
+            self.assertIn('Plyta w formacie ATX nie pasuje do obudowy', analysis['message'])
+            self.assertIn('pamiec RAM', analysis['message'])
+
+        with self.subTest('empty RAM without other optional choices preserves socket result'):
+            status, analysis = self.get_json(
+                '/api/analyze?cpuId=ryzen-7-7800x3d&motherboardId=asus-z790&ramId='
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertIn('socketu AM5', analysis['message'])
+            self.assertIn('pamiec RAM', analysis['message'])
+
     def test_catalog_exposes_power_demand_for_parts_and_power_rating(self):
         for products in (CPUS, MOTHERBOARDS, MEMORY):
             for product in products:
@@ -614,7 +656,7 @@ class AppTest(unittest.TestCase):
                 '&ramId=corsair-vengeance-ddr5'
             )
             self.assertEqual(status, 200)
-            self.assertEqual(analysis['level'], 'info')
+            self.assertEqual(analysis['level'], 'blocking')
             self.assertIn('zasilacz', analysis['message'].lower())
             self.assertIn('socketu AM5', analysis['message'])
 
@@ -624,7 +666,7 @@ class AppTest(unittest.TestCase):
                 '&ramId=corsair-vengeance-ddr5&psuId=unknown-psu'
             )
             self.assertEqual(status, 200)
-            self.assertEqual(analysis['level'], 'info')
+            self.assertEqual(analysis['level'], 'blocking')
             self.assertIn('znane czesci i zasilacz', analysis['message'])
             self.assertIn('socketu AM5', analysis['message'])
 

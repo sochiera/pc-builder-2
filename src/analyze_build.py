@@ -7,10 +7,10 @@ POWER_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz procesor, plyte glowna, pamiec RAM i 
 
 def combine_analyses(*analyses):
     levels = [analysis['level'] for analysis in analyses]
-    if 'info' in levels:
-        level = 'info'
-    elif 'blocking' in levels:
+    if 'blocking' in levels:
         level = 'blocking'
+    elif 'info' in levels:
+        level = 'info'
     else:
         level = 'ok'
     return {

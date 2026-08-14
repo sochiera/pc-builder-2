@@ -64,12 +64,9 @@ class AppHandler(BaseHTTPRequestHandler):
             has_all_part_keys = all(
                 name in query for name in ('cpuId', 'motherboardId', 'ramId')
             )
-            has_all_part_values = all(
-                value(name) for name in ('cpuId', 'motherboardId', 'ramId')
-            )
             if (
                 'psuId' in query
-                or (has_all_part_keys and has_all_part_values)
+                or has_all_part_keys
             ):
                 cpu_id = value('cpuId')
                 motherboard_id = value('motherboardId')
