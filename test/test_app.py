@@ -712,6 +712,91 @@ class AppTest(unittest.TestCase):
         self.assertTrue(all(link['hidden'] is True for link in state['failed']))
         self.assertIn('Nie udalo sie zapisac konfiguracji.', state['error'])
 
+    def test_page_compares_two_saved_configurations_and_refreshes_to_a_tie(self):
+        with Browser(self.base_url) as browser:
+            state = browser.evaluate("""
+                (async () => {
+                    const first = document.querySelector('#compare-first-id');
+                    const second = document.querySelector('#compare-second-id');
+                    const button = document.querySelector('#compare-configurations');
+                    const output = document.querySelector('#comparison-result');
+                    const responses = new Map([
+                        ['first-config|second-config', {
+                            first_configuration_id: 'first-config',
+                            second_configuration_id: 'second-config',
+                            first_cost_pln: 3975,
+                            second_cost_pln: 3250,
+                            cheaper: 'second',
+                        }],
+                        ['first-config|tie-config', {
+                            first_configuration_id: 'first-config',
+                            second_configuration_id: 'tie-config',
+                            first_cost_pln: 3975,
+                            second_cost_pln: 3975,
+                            cheaper: 'tie',
+                        }],
+                    ]);
+                    window.fetch = url => {
+                        const query = new URL(url, window.location).searchParams;
+                        const key = query.get('firstId') + '|' + query.get('secondId');
+                        const comparison = responses.get(key);
+                        return Promise.resolve({
+                            ok: Boolean(comparison),
+                            json: () => Promise.resolve(comparison || {
+                                error: 'Nie znaleziono porownania.',
+                            }),
+                        });
+                    };
+                    const waitFor = async predicate => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            if (predicate()) return true;
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        return false;
+                    };
+                    const controls = Boolean(first && second && button && output);
+                    if (!controls) return {
+                        controls,
+                        firstPair: false,
+                        refreshedPair: false,
+                        tie: false,
+                    };
+
+                    first.value = 'first-config';
+                    second.value = 'second-config';
+                    button.click();
+                    const firstPair = await waitFor(() =>
+                        output.textContent.includes('3975 PLN') &&
+                        output.textContent.includes('3250 PLN') &&
+                        output.textContent.toLowerCase().includes('second')
+                    );
+                    second.value = 'tie-config';
+                    button.click();
+                    const refreshedPair = await waitFor(() =>
+                        output.textContent.includes('3975 PLN') &&
+                        !output.textContent.includes('3250 PLN')
+                    );
+                    const tie = await waitFor(() =>
+                        output.textContent.toLowerCase().includes('tie') ||
+                        output.textContent.toLowerCase().includes('remis')
+                    );
+                    first.value = 'tie-config';
+                    second.value = 'tie-config';
+                    button.click();
+                    const unavailablePair = await waitFor(() =>
+                        output.textContent.toLowerCase().includes('dwa rozne dostepne zapisy') &&
+                        !output.textContent.includes('PLN')
+                    );
+                    return {controls, firstPair, refreshedPair, tie, unavailablePair};
+                })()
+            """)
+
+        self.assertTrue(state['controls'], 'ekran udostepnia porownywarke')
+        self.assertTrue(state['firstPair'], 'porownanie pokazuje oba koszty i tanszy wariant')
+        self.assertTrue(state['refreshedPair'], 'zmiana zapisu usuwa koszt poprzedniej pary')
+        self.assertTrue(state['tie'], 'porownanie rownych kosztow pokazuje remis')
+        self.assertTrue(state['unavailablePair'], 'nieudane porownanie czysci stary wynik i wyjasnia wymagane zapisy')
+
     def test_page_keeps_latest_started_save_after_responses_arrive_out_of_order(self):
         with Browser(self.base_url) as browser:
             state = browser.evaluate("""
