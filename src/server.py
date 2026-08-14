@@ -11,6 +11,7 @@ from src.analyze_build import analyze_case
 from src.analyze_build import analyze_products
 from src.analyze_build import analyze_power_supply
 from src.analyze_build import total_cost
+from src.analyze_build import analyze_budget
 from src.analyze_build import RAM_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import POWER_ANALYSIS_REQUIRED_MESSAGE
 from src.analyze_build import INITIAL_ANALYSIS_REQUIRED_MESSAGE
@@ -34,7 +35,7 @@ def page():
     return '''<!doctype html>
 <html lang=pl>
 <head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1><title>PC Builder</title>
-<style>body{max-width:720px;margin:48px auto;padding:0 20px;font:16px system-ui;color:#17211b;background:#f4f6f1}main{background:white;padding:32px;border-radius:14px}label{display:block;margin:20px 0 6px}select{width:100%;padding:10px}#result{display:block;margin-top:24px;padding:14px;background:#edf4e9;border-radius:8px}</style></head>
+<style>body{max-width:720px;margin:48px auto;padding:0 20px;font:16px system-ui;color:#17211b;background:#f4f6f1}main{background:white;padding:32px;border-radius:14px}label{display:block;margin:20px 0 6px}select,input{width:100%;padding:10px;box-sizing:border-box}#result,#budget-result{display:block;margin-top:24px;padding:14px;background:#edf4e9;border-radius:8px}</style></head>
 <body><main><h1>Konfigurator PC</h1><p>Sprawdz pierwszy warunek kompatybilnosci zestawu.</p>
  <label for=cpu>Procesor</label><select id=cpu><option value>Wybierz procesor</option>''' + cpu_options + '''</select>
  <label for=motherboard>Plyta glowna</label><select id=motherboard><option value>Wybierz plyte</option>''' + motherboard_options + '''</select>
@@ -43,7 +44,9 @@ def page():
   <label for=case>Obudowa</label><select id=case><option value>Wybierz obudowe</option>''' + case_options + '''</select>
       <output id=result>''' + INITIAL_ANALYSIS_REQUIRED_MESSAGE + '''</output>
      <p>Koszt zestawu: <output id=total-cost>0 PLN</output></p>
-     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),result=document.querySelector('#result'),totalCost=document.querySelector('#total-cost'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);if(caseSelect.value)params.set('caseId',caseSelect.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}selects.forEach(select=>select.addEventListener('change',refresh))</script>
+     <label for=budget>Budzet (PLN)</label><input id=budget type=text inputmode=numeric placeholder="Nie ustawiono">
+     <output id=budget-result>Podaj budzet jako nieujemna calkowita kwote w PLN.</output>
+     <script>const cpu=document.querySelector('#cpu'),motherboard=document.querySelector('#motherboard'),memory=document.querySelector('#memory'),powerSupply=document.querySelector('#power-supply'),caseSelect=document.querySelector('#case'),budget=document.querySelector('#budget'),result=document.querySelector('#result'),budgetResult=document.querySelector('#budget-result'),totalCost=document.querySelector('#total-cost'),selects=[cpu,motherboard,memory,powerSupply,caseSelect];let refreshGeneration=0;async function refresh(){const generation=++refreshGeneration;const params=new URLSearchParams();if(cpu.value)params.set('cpuId',cpu.value);if(motherboard.value)params.set('motherboardId',motherboard.value);if(memory.value)params.set('ramId',memory.value);if(powerSupply.value)params.set('psuId',powerSupply.value);if(caseSelect.value)params.set('caseId',caseSelect.value);if(budget.value)params.set('budgetPln',budget.value);const response=await fetch('/api/analyze?'+params);const analysis=await response.json();if(generation!==refreshGeneration)return;result.textContent=analysis.message;result.dataset.level=analysis.level;budgetResult.textContent=analysis.budget.message;budgetResult.dataset.level=analysis.budget.level;totalCost.textContent=analysis.total_cost_pln+' PLN'}selects.forEach(select=>select.addEventListener('change',refresh));budget.addEventListener('change',refresh)</script>
     </main></body></html>'''
 
 
@@ -148,6 +151,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 (value('cpuId'), value('motherboardId'), value('ramId'), value('psuId'), value('caseId')),
                 (CPUS, MOTHERBOARDS, MEMORY, POWER_SUPPLIES, CASES),
             )
+            result['budget'] = analyze_budget(value('budgetPln'), result['total_cost_pln'])
             self.respond(200, 'application/json; charset=utf-8', json.dumps(result))
             return
         if request.path == '/':

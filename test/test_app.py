@@ -465,6 +465,73 @@ class AppTest(unittest.TestCase):
             self.assertIn('total_cost_pln', analysis)
             self.assertEqual(analysis['total_cost_pln'], 0)
 
+    def test_analysis_compares_known_parts_cost_with_budget(self):
+        base_query = 'cpuId=ryzen-7-7800x3d&motherboardId=msi-b650'
+
+        with self.subTest('budget covers the selected parts'):
+            status, analysis = self.get_json(f'/api/analyze?{base_query}&budgetPln=3000')
+
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['total_cost_pln'], 2498)
+            self.assertIn('budget', analysis)
+            self.assertEqual(analysis['budget']['level'], 'ok')
+            self.assertEqual(analysis['budget']['remaining_pln'], 502)
+            self.assertIn('502', analysis['budget']['message'])
+
+        with self.subTest('budget is below the selected parts cost'):
+            status, analysis = self.get_json(f'/api/analyze?{base_query}&budgetPln=2000')
+
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['total_cost_pln'], 2498)
+            self.assertIn('budget', analysis)
+            self.assertEqual(analysis['budget']['level'], 'blocking')
+            self.assertEqual(analysis['budget']['overage_pln'], 498)
+            self.assertIn('498', analysis['budget']['message'])
+
+        with self.subTest('budget exactly matches the selected parts cost'):
+            status, analysis = self.get_json(f'/api/analyze?{base_query}&budgetPln=2498')
+
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['total_cost_pln'], 2498)
+            self.assertEqual(analysis['budget']['level'], 'ok')
+            self.assertEqual(analysis['budget']['remaining_pln'], 0)
+
+        with self.subTest('budget result does not replace incompatible hardware result'):
+            incompatible_query = 'cpuId=ryzen-7-7800x3d&motherboardId=asus-z790'
+            status, analysis = self.get_json(
+                f'/api/analyze?{incompatible_query}&budgetPln=2698'
+            )
+
+            self.assertEqual(status, 200)
+            self.assertEqual(analysis['total_cost_pln'], 2698)
+            self.assertEqual(analysis['level'], 'blocking')
+            self.assertEqual(analysis['budget']['level'], 'ok')
+            self.assertEqual(analysis['budget']['remaining_pln'], 0)
+
+        status, without_budget = self.get_json(f'/api/analyze?{base_query}')
+        self.assertEqual(status, 200)
+
+        invalid_budget_queries = [
+            ('missing budget', ''),
+            ('negative budget', '&budgetPln=-1'),
+            ('decimal budget', '&budgetPln=2000.0'),
+            ('formatted budget', '&budgetPln=2%20000'),
+            ('unicode digit budget', '&budgetPln=%C2%B2'),
+            ('budget exceeds integer conversion limit', '&budgetPln=' + '9' * 5000),
+        ]
+        for label, budget_query in invalid_budget_queries:
+            with self.subTest(label):
+                try:
+                    status, analysis = self.get_json(f'/api/analyze?{base_query}{budget_query}')
+                except Exception as error:
+                    self.fail(f'budget request raised {type(error).__name__}: {error}')
+
+                self.assertEqual(status, 200)
+                self.assertEqual(analysis['level'], without_budget['level'])
+                self.assertEqual(analysis['total_cost_pln'], without_budget['total_cost_pln'])
+                self.assertEqual(analysis['budget']['level'], 'info')
+                self.assertIn('nieujemna', analysis['budget']['message'])
+
     def test_memory_catalog_binds_products_to_public_standards(self):
         standards_by_id = {product['id']: product['standard'] for product in MEMORY}
 
@@ -838,6 +905,48 @@ class AppTest(unittest.TestCase):
         self.assertIn('1599 PLN', costs['afterCpu'])
         self.assertIn('2498 PLN', costs['afterMotherboard'])
         self.assertIn('2348 PLN', costs['afterDelayedPreviousResponse'])
+
+    def test_page_sends_budget_and_shows_budget_analysis_separately(self):
+        with Browser(self.base_url) as browser:
+            page_state = browser.evaluate("""
+                (async () => {
+                    const requests = [];
+                    window.fetch = url => {
+                        requests.push(url);
+                        return Promise.resolve({
+                            json: () => Promise.resolve({
+                                level: 'blocking',
+                                message: 'Sprzet jest niezgodny.',
+                                total_cost_pln: 2498,
+                                budget: {
+                                    level: 'blocking',
+                                    message: 'Budzet jest przekroczony o 498 PLN.'
+                                }
+                            })
+                        });
+                    };
+                    const budget = document.querySelector('#budget');
+                    if (budget) {
+                        budget.value = '2000';
+                        budget.dispatchEvent(new Event('change'));
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return {
+                        requests,
+                        hardwareLevel: document.querySelector('#result')?.dataset.level,
+                        hardwareMessage: document.querySelector('#result')?.textContent,
+                        budgetMessage: document.querySelector('#budget-result')?.textContent,
+                        budgetLevel: document.querySelector('#budget-result')?.dataset.level,
+                    };
+                })()
+            """)
+
+        self.assertEqual(len(page_state['requests']), 1)
+        self.assertIn('budgetPln=2000', page_state['requests'][0])
+        self.assertEqual(page_state['hardwareLevel'], 'blocking')
+        self.assertEqual(page_state['hardwareMessage'], 'Sprzet jest niezgodny.')
+        self.assertIn('Budzet jest przekroczony o 498 PLN.', page_state['budgetMessage'])
+        self.assertEqual(page_state['budgetLevel'], 'blocking')
 
     def test_page_reports_missing_cpu_when_power_supply_changes_before_complete_build(self):
         with Browser(self.base_url) as browser:

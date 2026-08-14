@@ -40,7 +40,7 @@ Jako osoba składająca PC chcę widzieć łączny koszt wybranych części, że
 - Sprawdzenie: uruchom demo, wybierz kolejno kilka nazwanych części i potwierdź po każdym wyborze, że widoczny łączny koszt odpowiada aktualnemu zestawowi.
 - Poza zakresem: budżet, historia i porównanie cen, oferty wielu sklepów, dostawa, rabaty oraz optymalizacja koszyka.
 
-## US-006 — Osoba składająca PC sprawdza, czy zestaw mieści się w budżecie  [nowa]
+## US-006 — Osoba składająca PC sprawdza, czy zestaw mieści się w budżecie  [w toku]
 
 Jako osoba składająca PC chcę podać swój budżet i zobaczyć, czy koszt wybranych części go przekracza, żeby kontrolować wydatki podczas kompletowania zestawu.
 

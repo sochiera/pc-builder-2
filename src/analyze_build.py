@@ -32,6 +32,34 @@ def total_cost(part_ids, catalogs):
     )
 
 
+def analyze_budget(budget_pln, build_cost):
+    if not budget_pln or not budget_pln.isascii() or not budget_pln.isdigit():
+        return {
+            'level': 'info',
+            'message': 'Podaj budzet jako nieujemna calkowita kwote w PLN.',
+        }
+
+    try:
+        budget = int(budget_pln)
+    except ValueError:
+        return {
+            'level': 'info',
+            'message': 'Podaj budzet jako nieujemna calkowita kwote w PLN.',
+        }
+    if budget >= build_cost:
+        return {
+            'level': 'ok',
+            'message': f'Zestaw miesci sie w budzecie; pozostaje {budget - build_cost} PLN.',
+            'remaining_pln': budget - build_cost,
+        }
+
+    return {
+        'level': 'blocking',
+        'message': f'Budzet jest przekroczony o {build_cost - budget} PLN.',
+        'overage_pln': build_cost - budget,
+    }
+
+
 def analyze_build(cpu_socket, motherboard_socket):
     if not cpu_socket or not motherboard_socket:
         return {
