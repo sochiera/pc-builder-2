@@ -32,7 +32,7 @@ Jako osoba składająca PC chcę dobrać obudowę do wybranej płyty głównej, 
 - Sprawdzenie: uruchom demo, wybierz płytę główną oraz kolejno pasującą i niepasującą obudowę, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
 - Poza zakresem: dopasowanie karty graficznej, chłodzenia i zasilacza, przepływ powietrza, złącza panelu obudowy, ceny oraz pozostałe zależności montażowe.
 
-## US-005 — Osoba składająca PC widzi łączny koszt wybranych części  [w toku]
+## US-005 — Osoba składająca PC widzi łączny koszt wybranych części  [do weryfikacji]
 
 Jako osoba składająca PC chcę widzieć łączny koszt wybranych części, żeby od razu ocenić, ile kosztuje mój aktualny zestaw.
 

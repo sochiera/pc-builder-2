@@ -743,6 +743,60 @@ class AppTest(unittest.TestCase):
         self.assertIn('ramId=corsair-vengeance-ddr5', requests[0])
         self.assertIn('psuId=corsair-rm750x', requests[0])
 
+    def test_page_shows_and_refreshes_current_build_cost(self):
+        with Browser(self.base_url) as browser:
+            costs = browser.evaluate("""
+                (async () => {
+                    const cost = () => document.querySelector('#total-cost')?.textContent || null;
+                    const waitForCost = async expected => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            if (cost()?.includes(expected)) return;
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        throw new Error(`Timed out waiting for ${expected}; got ${cost()}`);
+                    };
+                    const initial = cost();
+                    const cpu = document.querySelector('#cpu');
+                    cpu.value = 'ryzen-7-7800x3d';
+                    cpu.dispatchEvent(new Event('change'));
+                    await waitForCost('1599 PLN');
+                    const afterCpu = cost();
+                    const motherboard = document.querySelector('#motherboard');
+                    motherboard.value = 'msi-b650';
+                    motherboard.dispatchEvent(new Event('change'));
+                    await waitForCost('2498 PLN');
+                    const afterMotherboard = cost();
+                    const realFetch = window.fetch;
+                    let requestCount = 0;
+                    window.fetch = (...args) => {
+                        requestCount++;
+                        const response = realFetch(...args);
+                        if (requestCount !== 1) return response;
+                        return new Promise(resolve => {
+                            setTimeout(() => response.then(resolve), 100);
+                        });
+                    };
+                    cpu.value = 'core-i5-14600k';
+                    cpu.dispatchEvent(new Event('change'));
+                    motherboard.value = 'asus-z790';
+                    motherboard.dispatchEvent(new Event('change'));
+                    await waitForCost('2348 PLN');
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                    return {
+                        initial,
+                        afterCpu,
+                        afterMotherboard,
+                        afterDelayedPreviousResponse: cost(),
+                    };
+                })()
+            """)
+
+        self.assertIsNotNone(costs['initial'])
+        self.assertIn('0 PLN', costs['initial'])
+        self.assertIn('1599 PLN', costs['afterCpu'])
+        self.assertIn('2498 PLN', costs['afterMotherboard'])
+        self.assertIn('2348 PLN', costs['afterDelayedPreviousResponse'])
+
     def test_page_reports_missing_cpu_when_power_supply_changes_before_complete_build(self):
         with Browser(self.base_url) as browser:
             analysis = browser.evaluate("""
