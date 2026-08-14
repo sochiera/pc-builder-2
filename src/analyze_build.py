@@ -3,6 +3,10 @@ from src.catalog import find_product
 
 RAM_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz plyte glowna i pamiec RAM, aby sprawdzic zgodnosc.'
 POWER_ANALYSIS_REQUIRED_MESSAGE = 'Wybierz procesor, plyte glowna, pamiec RAM i zasilacz, aby sprawdzic moc.'
+INITIAL_ANALYSIS_REQUIRED_MESSAGE = (
+    f'{POWER_ANALYSIS_REQUIRED_MESSAGE} '
+    'Wybierz plyte glowna i obudowe, aby sprawdzic format.'
+)
 
 
 def combine_analyses(*analyses):

@@ -965,6 +965,108 @@ class AppTest(unittest.TestCase):
         self.assertEqual(statuses['incompatible']['text'], statuses['incompatiblePublic']['message'])
         self.assertEqual(statuses['location'], self.base_url + '/')
 
+    def test_page_shows_case_status_before_and_after_case_change(self):
+        with Browser(self.base_url) as browser:
+            statuses = browser.evaluate("""
+                (async () => {
+                    const waitForResult = async (level, text) => {
+                        for (let attempt = 0; attempt < 200; attempt++) {
+                            const result = document.querySelector('#result');
+                            if (result.dataset.level === level && result.textContent.includes(text)) {
+                                return;
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        throw new Error(`Timed out waiting for ${level}: ${text}`);
+                    };
+                    const initial = {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    };
+                    document.querySelector('#motherboard').value = 'msi-b650';
+                    const caseSelect = document.querySelector('#case');
+                    caseSelect.value = 'atx-mid-tower';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    await waitForResult('ok', 'pasuje do obudowy');
+                    const compatible = {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    };
+                    caseSelect.value = 'mini-itx-compact';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    await waitForResult('blocking', 'nie pasuje do obudowy');
+                    const motherboard = document.querySelector('#motherboard');
+                    const nativeFetch = window.fetch;
+                    const motherboardChangeRequests = [];
+                    window.fetch = url => {
+                        motherboardChangeRequests.push(url);
+                        return nativeFetch(url);
+                    };
+                    caseSelect.value = 'atx-mid-tower';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    await waitForResult('ok', 'pasuje do obudowy');
+                    motherboard.value = 'asus-z790';
+                    motherboard.dispatchEvent(new Event('change'));
+                    await waitForResult('ok', 'pasuje do obudowy');
+                    const afterMotherboardChange = {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                        requested: motherboardChangeRequests[motherboardChangeRequests.length - 1],
+                    };
+                    const responses = new Map();
+                    const requested = [];
+                    window.fetch = url => {
+                        requested.push(url);
+                        return new Promise(resolve => responses.set(url, resolve));
+                    };
+                    caseSelect.value = 'atx-mid-tower';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    caseSelect.value = 'mini-itx-compact';
+                    caseSelect.dispatchEvent(new Event('change'));
+                    while (requested.length < 2) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                    responses.get(requested[1])({json: () => Promise.resolve({
+                        level: 'blocking',
+                        message: 'Plyta ATX nie pasuje do obudowy Mini-ITX.'
+                    })});
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    responses.get(requested[0])({json: () => Promise.resolve({
+                        level: 'ok',
+                        message: 'Plyta ATX pasuje do obudowy ATX.'
+                    })});
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return {initial, compatible, incompatible: {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                    }, afterMotherboardChange, race: {
+                        level: document.querySelector('#result').dataset.level,
+                        text: document.querySelector('#result').textContent,
+                        requested,
+                    }};
+                })()
+            """)
+
+        self.assertIn('plyte', statuses['initial']['text'].lower())
+        self.assertIn('obudowe', statuses['initial']['text'].lower())
+        self.assertEqual(statuses['compatible']['level'], 'ok')
+        self.assertIn('ATX', statuses['compatible']['text'])
+        self.assertEqual(statuses['incompatible']['level'], 'blocking')
+        self.assertIn('ATX', statuses['incompatible']['text'])
+        self.assertIn('Mini-ITX', statuses['incompatible']['text'])
+        self.assertEqual(statuses['afterMotherboardChange']['level'], 'ok')
+        self.assertIn('ATX', statuses['afterMotherboardChange']['text'])
+        self.assertIn('motherboardId=asus-z790', statuses['afterMotherboardChange']['requested'])
+        self.assertIn('caseId=atx-mid-tower', statuses['afterMotherboardChange']['requested'])
+        self.assertEqual(len(statuses['race']['requested']), 2)
+        self.assertIn('caseId=atx-mid-tower', statuses['race']['requested'][0])
+        self.assertIn('caseId=mini-itx-compact', statuses['race']['requested'][1])
+        self.assertEqual(statuses['race']['level'], 'blocking')
+        self.assertEqual(
+            statuses['race']['text'],
+            'Plyta ATX nie pasuje do obudowy Mini-ITX.',
+        )
+
     def test_page_ignores_stale_ram_analysis_response(self):
         with Browser(self.base_url) as browser:
             status = browser.evaluate("""

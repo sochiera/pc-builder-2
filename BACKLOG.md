@@ -24,7 +24,7 @@ Jako osoba składająca PC chcę dobrać zasilacz do wybranych części, żeby p
 - Sprawdzenie: uruchom demo, wybierz zestaw części oraz kolejno zasilacz o wystarczającej i niewystarczającej mocy, a następnie potwierdź, że widoczna ocena rozróżnia oba przypadki.
 - Poza zakresem: zgodność złączy, sprawność i jakość zasilacza, zapas mocy, ceny, montaż fizyczny oraz pozostałe kategorie części.
 
-## US-004 — Osoba składająca PC sprawdza dopasowanie płyty głównej do obudowy  [w toku]
+## US-004 — Osoba składająca PC sprawdza dopasowanie płyty głównej do obudowy  [do weryfikacji]
 
 Jako osoba składająca PC chcę dobrać obudowę do wybranej płyty głównej, żeby przed zakupem zobaczyć, czy płyta zmieści się w obudowie.
 
