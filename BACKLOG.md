@@ -1,5 +1,13 @@
 # Backlog
 
+## US-016 — Osoba składająca PC wybiera tańszy z równie bezpiecznych wariantów  [nowa]
+
+Jako osoba składająca PC chcę przy porównaniu równie bezpiecznych zestawów zobaczyć wskazanie tańszego wariantu, żeby ograniczyć koszt bez rezygnacji ze zgodności ani budżetu.
+
+- Dlaczego teraz: PROJECT.md wymaga, aby koszty i rekomendacje wspierały wybór, task-029 potwierdził wskazanie tańszego zestawu, task-040 rekomendację według zgodności, a task-043 rekomendację według budżetu.
+- Sprawdzenie: uruchom demo, porównaj dwa zestawy bez blokujących konfliktów i z takim samym wynikiem budżetowym, ale o różnych kosztach, i potwierdź, że poza informacją o niższym koszcie ekran pokazuje odrębną rekomendację końcową tańszego wariantu, a przy równych kosztach nie pokazuje rekomendacji końcowej.
+- Poza zakresem: przedkładanie ceny nad zgodność lub budżet, ocena wydajności i zastosowania, proponowanie zamienników oraz porównanie więcej niż dwóch zestawów.
+
 ## US-015 — Osoba składająca PC wybiera wariant mieszczący się w budżecie  [do weryfikacji]
 
 Jako osoba składająca PC chcę przy porównaniu dwóch zestawów bez blokujących konfliktów zobaczyć wskazanie wariantu mieszczącego się w swoim budżecie, żeby nie wybrać konfiguracji przekraczającej mój limit wydatków.
